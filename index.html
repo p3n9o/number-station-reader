@@ -58,6 +58,14 @@ body{ padding: 28px 16px 60px; display:flex; justify-content:center; }
 .readout{ font-family: var(--mono); font-size: 13px; color: var(--phosphor); min-height: 18px; margin-top: 8px; letter-spacing: 0.05em; opacity: 0.85; }
 .readout.idle{ color: var(--bone-dim); }
 
+.spectro-wrap{ border: 1px solid var(--bezel); background: #060704; border-radius: 4px; padding: 14px 16px 12px; margin-bottom: 20px; }
+.spectro-wrap .meter-label{ margin-bottom: 8px; }
+.spectro-wrap .meter-label .tag{ font-size: 9px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--bezel); color: var(--bone-dim); letter-spacing: 0.1em; }
+.spectro-wrap .meter-label .tag.live{ border-color: var(--phosphor-dim); color: var(--phosphor); }
+.spectro-wrap .meter-label .tag.sim{ border-color: var(--amber); color: var(--amber); }
+#spectroCanvas{ display:block; width:100%; height:90px; border-radius: 2px; background:#060704; }
+.spectro-note{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); margin-top: 6px; letter-spacing: 0.03em; line-height:1.5; }
+
 label.field-label{ display:block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim); margin-bottom: 6px; }
 
 textarea{
@@ -180,6 +188,15 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
       <div class="readout idle" id="readout">awaiting traffic</div>
     </div>
 
+    <div class="spectro-wrap" id="spectroWrap">
+      <div class="meter-label">
+        <span>SPECTROGRAM</span>
+        <span class="tag" id="spectroTag">IDLE</span>
+      </div>
+      <canvas id="spectroCanvas" height="90"></canvas>
+      <div class="spectro-note" id="spectroNote">live analysis of playing audio · scrolls left to right, low freq at bottom</div>
+    </div>
+
     <label class="field-label" for="numbers">paste numbers</label>
     <textarea id="numbers" placeholder="e.g. 40928 17364 55210" spellcheck="false"></textarea>
     <div class="grouped-preview" id="preview"></div>
@@ -200,13 +217,13 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
 
       <div class="pack-bar">
         <label class="imp-label" for="bulkImport">⇪ import files to this pack</label>
-        <input type="file" id="bulkImport" multiple accept="audio/*">
+        <input type="file" id="bulkImport" multiple accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.weba,.webm">
         <button id="clearClips">clear this pack</button>
       </div>
       <div class="import-hint">
         bulk import matches filenames to slots automatically — name files like
-        <code>0.mp3</code> … <code>9.mp3</code>, <code>attention.mp3</code>, <code>end.mp3</code>
-        (case-insensitive, extension ignored). unmatched files are skipped.
+        <code>0.wav</code> … <code>9.wav</code>, <code>attention.mp3</code>, <code>end.ogg</code>
+        (case-insensitive, any extension — mp3, wav, ogg, m4a, flac, etc. all work, matching ignores it). unmatched files are skipped.
       </div>
 
       <div class="clip-grid" id="clipGrid"></div>
@@ -384,6 +401,145 @@ let meterInterval = null;
 function startMeter(){ stopMeter(); meterInterval = setInterval(()=> setMeter(true, 0.9), 90); }
 function stopMeter(){ if(meterInterval){ clearInterval(meterInterval); meterInterval = null; } setMeter(false, 0); }
 
+// ---------- spectrogram ----------
+// Real-mode: uploaded/custom audio clips are actual decodable audio, so we tap them
+// with a Web Audio AnalyserNode and draw a true frequency-over-time waterfall.
+// Sim-mode: the browser's built-in speech synthesis voices do NOT expose their audio
+// signal to any web API (no MediaStream, no buffer access) in any browser today, so a
+// literal FFT of TTS output isn't possible from a page. Instead we draw a stylised
+// formant-shaped waterfall driven by real speech timing (start/pause/end/boundary
+// events), so the display still tracks what's actually being spoken, just not from
+// real sample data. The SIM/LIVE tag makes it clear which one is on screen.
+const spectroCanvas = document.getElementById('spectroCanvas');
+const sctx = spectroCanvas.getContext('2d', { alpha: false });
+const spectroTag = document.getElementById('spectroTag');
+const spectroNote = document.getElementById('spectroNote');
+
+function resizeSpectro(){
+  const rect = spectroCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  spectroCanvas.width = Math.max(1, Math.round(rect.width * dpr));
+  spectroCanvas.height = Math.max(1, Math.round(90 * dpr));
+  sctx.fillStyle = '#060704';
+  sctx.fillRect(0, 0, spectroCanvas.width, spectroCanvas.height);
+}
+window.addEventListener('resize', resizeSpectro);
+resizeSpectro();
+
+let audioCtx = null, analyser = null, analyserData = null;
+function ensureAudioCtx(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return false;
+    audioCtx = new Ctx();
+  }
+  if(!analyser){
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
+    analyserData = new Uint8Array(analyser.frequencyBinCount);
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return true;
+}
+
+const analysedElements = new WeakSet();
+function connectAnalyserSource(audioEl){
+  if(mode !== 'custom') return;
+  if(!ensureAudioCtx()) return;
+  if(analysedElements.has(audioEl)) return;
+  try{
+    const src = audioCtx.createMediaElementSource(audioEl);
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    analysedElements.add(audioEl);
+  } catch(e){
+    // some browsers restrict this for cross-origin sources; the clip will still
+    // play normally through the audio element itself, just without a live trace
+  }
+}
+
+function colorForBin(v){ // v: 0-255
+  const t = Math.min(1, v / 255);
+  if(t < 0.55){
+    const k = t / 0.55;
+    return `rgb(${Math.round(10+k*25)}, ${Math.round(30+k*190)}, ${Math.round(18+k*70)})`;
+  } else if(t < 0.85){
+    const k = (t - 0.55) / 0.30;
+    return `rgb(${Math.round(35+k*210)}, ${Math.round(220-k*30)}, ${Math.round(88-k*70)})`;
+  } else {
+    const k = (t - 0.85) / 0.15;
+    return `rgb(${Math.round(245)}, ${Math.round(190-k*130)}, ${Math.round(18)})`;
+  }
+}
+
+function drawSpectroColumn(dataArray){
+  const w = spectroCanvas.width, h = spectroCanvas.height;
+  const shift = Math.max(1, Math.round(w / 350));
+  sctx.drawImage(spectroCanvas, shift, 0, w - shift, h, 0, 0, w - shift, h);
+  sctx.fillStyle = '#060704';
+  sctx.fillRect(w - shift, 0, shift, h);
+  const bins = dataArray.length;
+  const cellH = h / bins;
+  for(let i = 0; i < bins; i++){
+    const v = dataArray[i];
+    if(v < 4) continue;
+    sctx.fillStyle = colorForBin(v);
+    const y = h - (i + 1) * cellH;
+    sctx.fillRect(w - shift, Math.floor(y), shift, Math.ceil(cellH + 1));
+  }
+}
+
+let spectroRAF = null;
+function spectroFrameReal(){
+  if(analyser){
+    analyser.getByteFrequencyData(analyserData);
+    drawSpectroColumn(analyserData);
+  }
+  spectroRAF = requestAnimationFrame(spectroFrameReal);
+}
+
+let simPhase = 0;
+const SIM_BINS = 56;
+function spectroFrameSim(){
+  simPhase += 0.14;
+  const speaking = window.speechSynthesis.speaking && !window.speechSynthesis.pending;
+  const arr = new Uint8Array(SIM_BINS);
+  if(speaking && !pauseRequested){
+    for(let i = 0; i < SIM_BINS; i++){
+      const formant1 = Math.exp(-Math.pow((i - 6) / 4.5, 2)) * 170;
+      const formant2 = Math.exp(-Math.pow((i - 16) / 7, 2)) * 110;
+      const formant3 = Math.exp(-Math.pow((i - 30) / 10, 2)) * 55;
+      const flutter = (Math.sin(simPhase * 3 + i * 0.4) + 1) / 2 * 45;
+      const noise = Math.random() * 35;
+      arr[i] = Math.max(0, Math.min(255, formant1 + formant2 + formant3 + flutter + noise - (i * 0.6)));
+    }
+  }
+  drawSpectroColumn(arr);
+  spectroRAF = requestAnimationFrame(spectroFrameSim);
+}
+
+function startSpectro(){
+  cancelAnimationFrame(spectroRAF);
+  if(mode === 'custom'){
+    ensureAudioCtx();
+    spectroTag.textContent = 'LIVE';
+    spectroTag.className = 'tag live';
+    spectroNote.textContent = 'live analysis of the actual playing clip · low frequencies at bottom';
+    spectroFrameReal();
+  } else {
+    spectroTag.textContent = 'SIM';
+    spectroTag.className = 'tag sim';
+    spectroNote.textContent = 'stylised trace synced to speech timing · browser voices don\'t expose real audio data to the page';
+    spectroFrameSim();
+  }
+}
+function stopSpectro(){
+  if(spectroRAF){ cancelAnimationFrame(spectroRAF); spectroRAF = null; }
+  spectroTag.textContent = 'IDLE';
+  spectroTag.className = 'tag';
+}
+
 // ---------- clock ----------
 function tickClock(){
   const d = new Date();
@@ -425,7 +581,7 @@ slotDefs.forEach(def=>{
     <div class="status" id="status-${def.key}">empty</div>
     <div class="name" id="name-${def.key}"></div>
     <label class="upload-btn" for="file-${def.key}">upload</label>
-    <input type="file" id="file-${def.key}" accept="audio/*">
+    <input type="file" id="file-${def.key}" accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.weba,.webm">
     <button class="preview-btn" id="preview-${def.key}" style="display:none;">▶ test</button>
   `;
   clipGrid.appendChild(slot);
@@ -445,16 +601,42 @@ slotDefs.forEach(def=>{
     if(!entry) return;
     const a = new Audio(entry.url);
     a.volume = parseFloat(volumeEl.value);
-    a.play();
+    a.onerror = ()=>{
+      clipHint.textContent = 'couldn\'t play "' + entry.name + '" — this browser can\'t decode that file';
+      clipHint.classList.add('warn');
+    };
+    a.play().catch(()=>{
+      clipHint.textContent = 'couldn\'t play "' + entry.name + '" — this browser can\'t decode that file';
+      clipHint.classList.add('warn');
+    });
   });
 });
+
+const probeAudio = document.createElement('audio');
+function likelyPlayable(file){
+  // trust the browser's own MIME sniff first; fall back to extension-based guess
+  // (some OS file pickers report an empty/octet-stream type for less common formats)
+  const type = file.type;
+  if(type && type.startsWith('audio/')){
+    const verdict = probeAudio.canPlayType(type);
+    if(verdict) return true;
+  }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const knownExt = ['mp3','wav','wave','ogg','oga','opus','m4a','aac','flac','weba','webm','mp4','3gp'];
+  return knownExt.includes(ext);
+}
 
 function assignClip(packName, key, file){
   const pack = packs[packName];
   if(pack[key] && pack[key].url && pack[key].url.startsWith('blob:')) URL.revokeObjectURL(pack[key].url);
-  pack[key] = { url: URL.createObjectURL(file), name: file.name };
+  const supported = likelyPlayable(file);
+  pack[key] = { url: URL.createObjectURL(file), name: file.name, unsure: !supported };
   if(packName === activePack) renderSlot(key);
   updatePreview();
+  if(!supported){
+    clipHint.textContent = '"' + file.name + '" has an unrecognized format — it may still play, but check it with the ▶ test button';
+    clipHint.classList.add('warn');
+  }
 }
 
 function renderSlot(key){
@@ -465,7 +647,7 @@ function renderSlot(key){
   const previewBtn = document.getElementById('preview-'+key);
   if(entry){
     slotEl.classList.add('loaded');
-    statusEl.textContent = 'loaded';
+    statusEl.textContent = entry.unsure ? 'loaded (unverified)' : 'loaded';
     nameEl.textContent = entry.name;
     previewBtn.style.display = 'block';
   } else {
@@ -655,7 +837,7 @@ function setUiPlaying(playing){
   stopBtn.disabled = !playing;
   statusText.textContent = playing ? 'TRANSMITTING' : 'STANDBY';
   readout.classList.toggle('idle', !playing);
-  if(playing) startMeter(); else stopMeter();
+  if(playing){ startMeter(); startSpectro(); } else { stopMeter(); stopSpectro(); }
 }
 
 function sleep(ms){
@@ -676,9 +858,10 @@ function playAudioItem(item){
     a.playbackRate = parseFloat(rateEl.value);
     a.volume = parseFloat(volumeEl.value);
     currentAudioEl = a;
+    connectAnalyserSource(a);
     a.onended = ()=>{ currentAudioEl = null; resolve(); };
-    a.onerror = ()=>{ currentAudioEl = null; resolve(); };
-    a.play().catch(()=>{ currentAudioEl = null; resolve(); });
+    a.onerror = ()=>{ readout.textContent = 'clip "' + item.label + '" failed to decode — skipping'; currentAudioEl = null; resolve(); };
+    a.play().catch(()=>{ readout.textContent = 'clip "' + item.label + '" failed to decode — skipping'; currentAudioEl = null; resolve(); });
   });
 }
 
@@ -753,6 +936,7 @@ pauseBtn.addEventListener('click', ()=>{
     pauseBtn.textContent = '▶ resume';
     statusText.textContent = 'HOLDING';
     stopMeter();
+    if(mode === 'custom') cancelAnimationFrame(spectroRAF);
   } else {
     pauseRequested = false;
     if(mode === 'browser') window.speechSynthesis.resume();
@@ -760,6 +944,7 @@ pauseBtn.addEventListener('click', ()=>{
     pauseBtn.textContent = '‖ hold';
     statusText.textContent = 'TRANSMITTING';
     startMeter();
+    if(mode === 'custom') spectroFrameReal();
   }
 });
 
