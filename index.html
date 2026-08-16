@@ -68,6 +68,40 @@ body{ padding: 28px 16px 60px; display:flex; justify-content:center; }
 @media (max-width: 520px){ .spectro-controls{ grid-template-columns: 1fr; } }
 .spectro-note{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); margin-top: 6px; letter-spacing: 0.03em; line-height:1.5; }
 
+.theme-picker{ display:flex; flex-wrap:wrap; gap:8px; }
+.theme-picker.spaced{ margin-bottom: 20px; }
+.theme-swatch{
+  flex: 1 1 90px; min-width: 84px; border: 1px solid var(--bezel); border-radius: 4px;
+  padding: 7px; cursor: pointer; text-align: center; background: var(--panel);
+  transition: border-color 120ms ease;
+}
+.theme-swatch:hover{ border-color: var(--bone-dim); }
+.theme-swatch.active{ border-color: var(--phosphor-dim); box-shadow: 0 0 0 1px var(--phosphor-dim) inset; }
+.theme-swatch .preview{ display:flex; height: 16px; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.theme-swatch .preview span{ flex: 1; }
+.theme-swatch .label{ font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--bone-dim); }
+.theme-swatch.active .label{ color: var(--bone); }
+.theme-group-label{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
+.theme-group-label .tier{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); letter-spacing: 0.08em; }
+
+details.theme-collapse{ margin-bottom: 18px; }
+details.theme-collapse:last-child{ margin-bottom: 0; }
+details.theme-collapse summary{
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim);
+  padding: 2px 0; user-select: none;
+}
+details.theme-collapse summary::-webkit-details-marker{ display: none; }
+details.theme-collapse summary .chev{
+  display: inline-block; color: var(--bone-dim); transition: transform 120ms ease; font-size: 10px;
+}
+details.theme-collapse[open] summary .chev{ transform: rotate(90deg); }
+details.theme-collapse summary:hover{ color: var(--bone); }
+details.theme-collapse summary .current{
+  margin-left: auto; color: var(--phosphor); font-size: 10px; letter-spacing: 0.05em; text-transform: none;
+}
+details.theme-collapse .theme-picker{ margin-top: 10px; }
+
 label.field-label{ display:block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim); margin-bottom: 6px; }
 
 textarea{
@@ -184,6 +218,11 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
 
   <div class="cabinet">
 
+    <details class="theme-collapse" id="uiThemeDetails">
+      <summary><span class="chev">▸</span><span>interface theme</span><span class="current" id="uiThemeCurrent">Phosphor</span></summary>
+      <div class="theme-picker spaced" id="uiThemePicker"></div>
+    </details>
+
     <div class="meter-wrap">
       <div class="meter-label"><span>SIGNAL</span><span id="statusText">STANDBY</span></div>
       <div class="meter-bars" id="meterBars"></div>
@@ -214,6 +253,10 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
           <input type="range" id="specMaxFreq" min="500" max="20000" step="100" value="8000">
         </div>
       </div>
+      <details class="theme-collapse" id="spectroThemeDetails" style="margin-top:14px;">
+        <summary><span class="chev">▸</span><span>spectrogram palette</span><span class="current" id="spectroThemeCurrent">Classic</span></summary>
+        <div class="theme-picker" id="spectroThemePicker"></div>
+      </details>
       <div class="spectro-note" id="spectroNote">live analysis of playing audio · scrolls left to right, low freq at bottom</div>
     </div>
 
@@ -364,6 +407,75 @@ const repeatsVal = document.getElementById('repeatsVal');
 const digitWords = ['zero','one','two','three','four','five','six','seven','eight','nine'];
 let mode = 'browser'; // 'browser' | 'custom'
 
+// ---------- interface theme presets ----------
+// "contrast" ones use saturated, high-value accents against a near-black panel for
+// max legibility. "pastel" ones desaturate and lighten everything for a softer,
+// washed-out look — still functional, just quieter on the eyes.
+const uiThemes = {
+  phosphor: { label:'Phosphor', tier:'contrast', vars:{
+    '--bg':'#0a0c08','--panel':'#14170f','--panel-raised':'#191d13','--bezel':'#2a2e21',
+    '--phosphor':'#39ff6a','--phosphor-dim':'#1f8f3e','--amber':'#ffb347','--bone':'#c9cbb8','--bone-dim':'#6f7364','--red':'#e4442e'
+  }},
+  amberTerm: { label:'Amber Term', tier:'contrast', vars:{
+    '--bg':'#0c0a06','--panel':'#17130d','--panel-raised':'#1d1810','--bezel':'#332b1c',
+    '--phosphor':'#ffb454','--phosphor-dim':'#b9772a','--amber':'#ffd27a','--bone':'#e8d9bd','--bone-dim':'#8a7a5e','--red':'#ff5a3c'
+  }},
+  bloodSignal: { label:'Blood Signal', tier:'contrast', vars:{
+    '--bg':'#0c0505','--panel':'#170a0a','--panel-raised':'#1e0d0d','--bezel':'#3a1414',
+    '--phosphor':'#ff4d4d','--phosphor-dim':'#a12626','--amber':'#ff9f4d','--bone':'#e8c7c7','--bone-dim':'#8a6060','--red':'#ff2020'
+  }},
+  iceCyan: { label:'Ice Cyan', tier:'contrast', vars:{
+    '--bg':'#050a0c','--panel':'#0d161a','--panel-raised':'#111e22','--bezel':'#1f3a40',
+    '--phosphor':'#5be3ff','--phosphor-dim':'#2b8fa8','--amber':'#a0f0ff','--bone':'#cfe9ee','--bone-dim':'#69898f','--red':'#ff5d7a'
+  }},
+  dustyRose: { label:'Dusty Rose', tier:'pastel', vars:{
+    '--bg':'#211a1d','--panel':'#2c2225','--panel-raised':'#33272b','--bezel':'#493a3e',
+    '--phosphor':'#d99fae','--phosphor-dim':'#a4707e','--amber':'#e0b48c','--bone':'#e6d3d6','--bone-dim':'#9c8489','--red':'#c97b7b'
+  }},
+  sageFog: { label:'Sage Fog', tier:'pastel', vars:{
+    '--bg':'#1b1e1a','--panel':'#232823','--panel-raised':'#2a302a','--bezel':'#3d443c',
+    '--phosphor':'#a8c1a3','--phosphor-dim':'#7c9478','--amber':'#c9b98a','--bone':'#d8ded4','--bone-dim':'#8d968a','--red':'#c78f7f'
+  }},
+  slateBlue: { label:'Slate Blue', tier:'pastel', vars:{
+    '--bg':'#191c22','--panel':'#20242c','--panel-raised':'#262b34','--bezel':'#3a4150',
+    '--phosphor':'#9fb4d9','--phosphor-dim':'#71839f','--amber':'#c2a8d9','--bone':'#d6dce6','--bone-dim':'#838ea0','--red':'#c98da8'
+  }},
+  driftwood: { label:'Driftwood', tier:'pastel', vars:{
+    '--bg':'#1e1c18','--panel':'#28251f','--panel-raised':'#2f2b24','--bezel':'#463f34',
+    '--phosphor':'#cbb98f','--phosphor-dim':'#998a68','--amber':'#d9c9a3','--bone':'#e2d8c4','--bone-dim':'#948a76','--red':'#c99575'
+  }}
+};
+let activeUiTheme = 'phosphor';
+
+function applyUiTheme(key){
+  const theme = uiThemes[key];
+  if(!theme) return;
+  Object.entries(theme.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+  activeUiTheme = key;
+  document.getElementById('uiThemeCurrent').textContent = theme.label;
+  document.querySelectorAll('#uiThemePicker .theme-swatch').forEach(el=>{
+    el.classList.toggle('active', el.dataset.key === key);
+  });
+}
+
+function renderUiThemePicker(){
+  const container = document.getElementById('uiThemePicker');
+  container.innerHTML = '';
+  Object.entries(uiThemes).forEach(([key, theme])=>{
+    const swatch = document.createElement('div');
+    swatch.className = 'theme-swatch' + (key === activeUiTheme ? ' active' : '');
+    swatch.dataset.key = key;
+    const colors = [theme.vars['--bg'], theme.vars['--phosphor'], theme.vars['--amber'], theme.vars['--red']];
+    swatch.innerHTML = `
+      <div class="preview">${colors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
+      <div class="label">${theme.label}</div>
+    `;
+    swatch.addEventListener('click', ()=> applyUiTheme(key));
+    container.appendChild(swatch);
+  });
+}
+renderUiThemePicker();
+
 const slotDefs = [
   {key:'0',label:'0'},{key:'1',label:'1'},{key:'2',label:'2'},{key:'3',label:'3'},
   {key:'4',label:'4'},{key:'5',label:'5'},{key:'6',label:'6'},{key:'7',label:'7'},
@@ -443,12 +555,93 @@ const sctx = spectroCanvas.getContext('2d', { alpha: false });
 const spectroTag = document.getElementById('spectroTag');
 const spectroNote = document.getElementById('spectroNote');
 
+// ---------- spectrogram color palettes ----------
+// Each palette is a set of colour stops (t: 0-1 signal intensity -> rgb) that
+// colorForBin() interpolates between. "contrast" palettes push toward pure,
+// saturated hues for max legibility; "pastel" ones stay muted/light throughout.
+const spectroThemes = {
+  classic: { label:'Classic', tier:'contrast', stops:[
+    {t:0, rgb:[6,7,4]}, {t:0.55, rgb:[35,220,88]}, {t:0.85, rgb:[245,190,18]}, {t:1, rgb:[245,60,18]}
+  ]},
+  ice: { label:'Ice', tier:'contrast', stops:[
+    {t:0, rgb:[4,6,10]}, {t:0.5, rgb:[20,120,220]}, {t:0.8, rgb:[120,220,255]}, {t:1, rgb:[255,255,255]}
+  ]},
+  thermal: { label:'Thermal', tier:'contrast', stops:[
+    {t:0, rgb:[8,4,10]}, {t:0.4, rgb:[110,20,120]}, {t:0.7, rgb:[230,90,20]}, {t:1, rgb:[255,230,60]}
+  ]},
+  mono: { label:'Mono Alert', tier:'contrast', stops:[
+    {t:0, rgb:[4,4,4]}, {t:0.6, rgb:[130,20,20]}, {t:0.85, rgb:[220,30,30]}, {t:1, rgb:[255,120,90]}
+  ]},
+  dustyPastel: { label:'Dusty Pastel', tier:'pastel', stops:[
+    {t:0, rgb:[36,28,32]}, {t:0.5, rgb:[190,140,150]}, {t:0.8, rgb:[220,180,195]}, {t:1, rgb:[240,220,205]}
+  ]},
+  foggyGrey: { label:'Foggy Grey', tier:'pastel', stops:[
+    {t:0, rgb:[22,24,28]}, {t:0.5, rgb:[115,130,145]}, {t:0.8, rgb:[168,183,193]}, {t:1, rgb:[218,226,230]}
+  ]},
+  sepiaFade: { label:'Sepia Fade', tier:'pastel', stops:[
+    {t:0, rgb:[26,21,16]}, {t:0.5, rgb:[165,135,95]}, {t:0.8, rgb:[205,180,145]}, {t:1, rgb:[232,217,192]}
+  ]}
+};
+let activeSpectroTheme = 'classic';
+
+function spectroBgRgb(){
+  return spectroThemes[activeSpectroTheme].stops[0].rgb;
+}
+function spectroBgColorStr(){
+  const [r,g,b] = spectroBgRgb();
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function colorForBin(v){ // v: 0-255
+  const t = Math.min(1, v / 255);
+  const stops = spectroThemes[activeSpectroTheme].stops;
+  let i = 0;
+  while(i < stops.length - 2 && t > stops[i+1].t) i++;
+  const a = stops[i], b = stops[i+1];
+  const span = (b.t - a.t) || 1;
+  const k = (t - a.t) / span;
+  const r = Math.round(a.rgb[0] + (b.rgb[0]-a.rgb[0]) * k);
+  const g = Math.round(a.rgb[1] + (b.rgb[1]-a.rgb[1]) * k);
+  const bch = Math.round(a.rgb[2] + (b.rgb[2]-a.rgb[2]) * k);
+  return `rgb(${r}, ${g}, ${bch})`;
+}
+
+function applySpectroTheme(key){
+  if(!spectroThemes[key]) return;
+  activeSpectroTheme = key;
+  spectroCanvas.style.background = spectroBgColorStr();
+  document.getElementById('spectroThemeCurrent').textContent = spectroThemes[key].label;
+  document.querySelectorAll('#spectroThemePicker .theme-swatch').forEach(el=>{
+    el.classList.toggle('active', el.dataset.key === key);
+  });
+}
+
+function renderSpectroThemePicker(){
+  const container = document.getElementById('spectroThemePicker');
+  container.innerHTML = '';
+  Object.entries(spectroThemes).forEach(([key, theme])=>{
+    const swatch = document.createElement('div');
+    swatch.className = 'theme-swatch' + (key === activeSpectroTheme ? ' active' : '');
+    swatch.dataset.key = key;
+    const stops = theme.stops;
+    const previewColors = [stops[0], stops[Math.floor(stops.length/2)], stops[stops.length-1]]
+      .map(s => `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})`);
+    swatch.innerHTML = `
+      <div class="preview">${previewColors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
+      <div class="label">${theme.label}</div>
+    `;
+    swatch.addEventListener('click', ()=> applySpectroTheme(key));
+    container.appendChild(swatch);
+  });
+}
+renderSpectroThemePicker();
+
 function resizeSpectro(){
   const rect = spectroCanvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   spectroCanvas.width = Math.max(1, Math.round(rect.width * dpr));
   spectroCanvas.height = Math.max(1, Math.round(90 * dpr));
-  sctx.fillStyle = '#060704';
+  sctx.fillStyle = spectroBgColorStr();
   sctx.fillRect(0, 0, spectroCanvas.width, spectroCanvas.height);
 }
 window.addEventListener('resize', resizeSpectro);
@@ -487,26 +680,16 @@ function connectAnalyserSource(audioEl){
   }
 }
 
-function colorForBin(v){ // v: 0-255
-  const t = Math.min(1, v / 255);
-  if(t < 0.55){
-    const k = t / 0.55;
-    return `rgb(${Math.round(10+k*25)}, ${Math.round(30+k*190)}, ${Math.round(18+k*70)})`;
-  } else if(t < 0.85){
-    const k = (t - 0.55) / 0.30;
-    return `rgb(${Math.round(35+k*210)}, ${Math.round(220-k*30)}, ${Math.round(88-k*70)})`;
-  } else {
-    const k = (t - 0.85) / 0.15;
-    return `rgb(${Math.round(245)}, ${Math.round(190-k*130)}, ${Math.round(18)})`;
-  }
-}
+// ---------- spectrogram color palettes ----------
+// (definitions live earlier in the script, right before resizeSpectro, since
+// resizeSpectro needs spectroBgColorStr() on its very first call)
 
 function drawSpectroColumn(dataArray){
   const w = spectroCanvas.width, h = spectroCanvas.height;
   const zoom = parseFloat(specZoomEl.value) || 1;
   const shift = Math.max(1, Math.round((w / 350) * zoom));
   sctx.drawImage(spectroCanvas, shift, 0, w - shift, h, 0, 0, w - shift, h);
-  sctx.fillStyle = '#060704';
+  sctx.fillStyle = spectroBgColorStr();
   sctx.fillRect(w - shift, 0, shift, h);
   const bins = dataArray.length;
   const cellH = h / bins;
