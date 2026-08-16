@@ -652,17 +652,31 @@ slotDefs.forEach(def=>{
     const a = new Audio(entry.url);
     a.volume = parseFloat(volumeEl.value);
     a.onerror = ()=>{
-      clipHint.textContent = 'couldn\'t play "' + entry.name + '" — this browser can\'t decode that file';
+      clipHint.textContent = describeMediaError(a, entry.name);
       clipHint.classList.add('warn');
     };
-    a.play().catch(()=>{
-      clipHint.textContent = 'couldn\'t play "' + entry.name + '" — this browser can\'t decode that file';
+    a.play().catch((playErr)=>{
+      clipHint.textContent = a.error ? describeMediaError(a, entry.name) : ('"' + entry.name + '" was blocked from playing: ' + playErr.message);
       clipHint.classList.add('warn');
     });
   });
 });
 
 const probeAudio = document.createElement('audio');
+// HTMLMediaElement failures get lumped into one generic "error" event, but the
+// error object actually tells you what really happened — missing/404 file,
+// network problem, or a genuine "the browser can't decode this codec" failure.
+// Distinguishing these matters: the first two are almost always a bad path or a
+// file that never uploaded, not a format problem.
+function describeMediaError(audioEl, label){
+  const err = audioEl.error;
+  const code = err ? err.code : null;
+  if(code === 2) return '"' + label + '" couldn\'t be loaded — the file wasn\'t found (check the path/upload, not the format)';
+  if(code === 4) return '"' + label + '" is a format this browser can\'t play at all (unsupported codec/container)';
+  if(code === 3) return '"' + label + '" downloaded but the browser couldn\'t decode the audio data (corrupt file or unusual codec settings)';
+  if(code === 1) return '"' + label + '" playback was aborted';
+  return '"' + label + '" couldn\'t be played (unknown error)';
+}
 // Map of extension -> correct MIME type. Blob URLs inherit whatever MIME type the
 // File object reports, and many OS file pickers report a blank or generic type
 // (application/octet-stream, or nothing at all) for .wav and other non-mp3 files.
@@ -951,8 +965,8 @@ function playAudioItem(item){
     currentAudioEl = a;
     connectAnalyserSource(a);
     a.onended = ()=>{ currentAudioEl = null; resolve(); };
-    a.onerror = ()=>{ readout.textContent = 'clip "' + item.label + '" failed to decode — skipping'; currentAudioEl = null; resolve(); };
-    a.play().catch(()=>{ readout.textContent = 'clip "' + item.label + '" failed to decode — skipping'; currentAudioEl = null; resolve(); });
+    a.onerror = ()=>{ readout.textContent = describeMediaError(a, item.label) + ' — skipping'; currentAudioEl = null; resolve(); };
+    a.play().catch((playErr)=>{ readout.textContent = (a.error ? describeMediaError(a, item.label) : ('"' + item.label + '" was blocked from playing: ' + playErr.message)) + ' — skipping'; currentAudioEl = null; resolve(); });
   });
 }
 
