@@ -1,0 +1,16 @@
+{
+  "G02": {
+    "0": "voices/g02/0.mp3",
+    "1": "voices/g02/1.mp3",
+    "2": "voices/g02/2.mp3",
+    "3": "voices/g02/3.mp3",
+    "4": "voices/g02/4.mp3",
+    "5": "voices/g02/5.mp3",
+    "6": "voices/g02/6.mp3",
+    "7": "voices/g02/7.mp3",
+    "8": "voices/g02/8.mp3",
+    "9": "voices/g02/9.mp3",
+    "attention": "voices/g02/attention.mp3",
+    "end": "voices/g02/end.mp3"
+  }
+}
