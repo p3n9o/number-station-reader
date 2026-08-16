@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NUMBERS — Station Reader</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Oswald:wght@400;500;600&display=swap');
+
+:root{
+  --bg: #0a0c08;
+  --panel: #14170f;
+  --panel-raised: #191d13;
+  --bezel: #2a2e21;
+  --phosphor: #39ff6a;
+  --phosphor-dim: #1f8f3e;
+  --amber: #ffb347;
+  --bone: #c9cbb8;
+  --bone-dim: #6f7364;
+  --red: #e4442e;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Oswald', sans-serif;
+}
+
+*{ box-sizing: border-box; }
+
+html,body{
+  margin:0;
+  min-height:100%;
+  background: radial-gradient(ellipse at 50% -10%, #1a1e12 0%, var(--bg) 55%);
+  color: var(--bone);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body{ padding: 28px 16px 60px; display:flex; justify-content:center; }
+.set{ width:100%; max-width: 780px; }
+
+.callsign{
+  display:flex; justify-content:space-between; align-items:baseline;
+  border-bottom: 1px solid var(--bezel); padding-bottom: 10px; margin-bottom: 18px;
+}
+.callsign h1{ font-family: var(--mono); font-weight:700; font-size: 20px; letter-spacing: 0.14em; color: var(--bone); margin:0; }
+.callsign h1 span{ color: var(--amber); }
+.callsign .freq{ font-family: var(--mono); font-size: 12px; color: var(--bone-dim); letter-spacing: 0.08em; }
+
+.cabinet{
+  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+  border: 1px solid var(--bezel); border-radius: 6px; padding: 22px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 30px 60px -25px rgba(0,0,0,0.8);
+}
+
+.meter-wrap{ border: 1px solid var(--bezel); background: #060704; border-radius: 4px; padding: 14px 16px 10px; margin-bottom: 20px; }
+.meter-label{ font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--bone-dim); display:flex; justify-content:space-between; margin-bottom: 8px; }
+.meter-bars{ display:flex; align-items:flex-end; gap: 3px; height: 34px; }
+.meter-bars i{ flex:1; background: var(--phosphor-dim); height: 15%; border-radius: 1px; transition: height 90ms ease, background 90ms ease; }
+.meter-bars.live i{ background: var(--phosphor); }
+
+.readout{ font-family: var(--mono); font-size: 13px; color: var(--phosphor); min-height: 18px; margin-top: 8px; letter-spacing: 0.05em; opacity: 0.85; }
+.readout.idle{ color: var(--bone-dim); }
+
+label.field-label{ display:block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim); margin-bottom: 6px; }
+
+textarea{
+  width:100%; background: #050603; border: 1px solid var(--bezel); border-radius: 4px;
+  color: var(--phosphor); font-family: var(--mono); font-size: 17px; letter-spacing: 0.12em;
+  padding: 14px; resize: vertical; min-height: 90px; outline:none;
+}
+textarea::placeholder{ color: var(--phosphor-dim); opacity:0.6; }
+textarea:focus{ border-color: var(--phosphor-dim); }
+
+.grouped-preview{ font-family: var(--mono); font-size: 13px; color: var(--bone-dim); margin-top: 8px; min-height: 16px; word-break: break-all; }
+.warn{ color: var(--red); }
+
+.mode-switch{ display:flex; gap:8px; margin: 18px 0 4px; }
+.mode-btn{
+  flex:1; padding: 10px 12px; border-radius: 4px; border: 1px solid var(--bezel);
+  background: var(--panel); color: var(--bone-dim); font-family: var(--mono);
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor:pointer; text-align:center;
+}
+.mode-btn.active{ border-color: var(--phosphor-dim); color: var(--phosphor); background: rgba(57,255,106,0.06); }
+
+.clip-panel{ margin-top: 14px; border: 1px solid var(--bezel); border-radius: 4px; padding: 14px; background: #0d0f0a; }
+
+/* ---- pack bar ---- */
+.pack-bar{ display:flex; gap:8px; align-items:center; margin-bottom: 14px; flex-wrap: wrap; }
+.pack-bar select{
+  flex: 1; min-width: 140px; background: var(--panel); border: 1px solid var(--bezel); color: var(--phosphor);
+  font-family: var(--mono); font-size: 13px; padding: 8px 10px; border-radius: 3px; outline:none;
+}
+.pack-bar input[type=text]{
+  flex: 1; min-width: 120px; background: #050603; border: 1px solid var(--bezel); color: var(--bone);
+  font-family: var(--mono); font-size: 12px; padding: 8px 10px; border-radius: 3px; outline:none;
+}
+.pack-bar button{ font-size: 11px; padding: 8px 10px; white-space: nowrap; }
+.pack-bar .imp-label{
+  font-family: var(--mono); font-size: 11px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--phosphor-dim);
+  color: var(--phosphor); cursor:pointer; white-space: nowrap;
+}
+.pack-bar .imp-label:hover{ background: rgba(57,255,106,0.08); }
+.pack-bar input[type=file]{ display:none; }
+
+.import-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); margin: -6px 0 14px; line-height:1.5; }
+.import-hint code{ color: var(--amber); }
+
+.clip-grid{ display:grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+@media (max-width: 560px){ .clip-grid{ grid-template-columns: repeat(3, 1fr); } }
+.clip-slot{
+  border: 1px dashed var(--bezel); border-radius: 4px; padding: 8px 6px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:6px; position:relative;
+}
+.clip-slot.loaded{ border-style: solid; border-color: var(--phosphor-dim); }
+.clip-slot .key{ font-family: var(--mono); font-size: 15px; font-weight:700; color: var(--bone); }
+.clip-slot .status{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); letter-spacing: 0.05em; }
+.clip-slot.loaded .status{ color: var(--phosphor); }
+.clip-slot .name{ font-size: 8px; color: var(--bone-dim); max-width: 100%; overflow:hidden; text-overflow: ellipsis; white-space:nowrap; }
+.clip-slot input[type=file]{ display:none; }
+.clip-slot .upload-btn, .clip-slot .preview-btn{
+  font-family: var(--mono); font-size: 10px; color: var(--bone); background: var(--panel);
+  border: 1px solid var(--bezel); border-radius: 3px; padding: 3px 6px; cursor:pointer; width:100%;
+}
+.clip-slot .upload-btn:hover, .clip-slot .preview-btn:hover{ border-color: var(--phosphor-dim); }
+
+.clip-actions{ display:flex; justify-content:space-between; align-items:center; margin-top: 12px; }
+.clip-actions button{ font-size: 11px; padding: 7px 10px; }
+.clip-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); }
+
+.controls{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; margin-top: 22px; }
+@media (max-width: 520px){ .controls{ grid-template-columns: 1fr; } }
+.ctrl.disabled{ opacity: 0.35; pointer-events: none; }
+.ctrl select, .ctrl input[type=number]{
+  width:100%; background: var(--panel); border: 1px solid var(--bezel); color: var(--bone);
+  font-family: var(--mono); font-size: 13px; padding: 8px 10px; border-radius: 3px; outline:none;
+}
+.ctrl select:focus, .ctrl input[type=number]:focus{ border-color: var(--phosphor-dim); }
+.ctrl input[type=range]{ width:100%; accent-color: var(--amber); height: 18px; }
+.ctrl .row{ display:flex; justify-content:space-between; align-items:baseline; }
+.ctrl .val{ font-family: var(--mono); font-size: 12px; color: var(--amber); }
+
+.toggle-row{ display:flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; }
+.toggle{ display:flex; align-items:center; gap:8px; font-family: var(--mono); font-size: 12px; color: var(--bone); cursor:pointer; user-select:none; }
+.toggle input{ accent-color: var(--phosphor); width:15px; height:15px; }
+.toggle.disabled{ opacity: 0.35; pointer-events: none; }
+
+.transport{ display:flex; gap: 10px; margin-top: 22px; }
+button{
+  font-family: var(--sans); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 13px; padding: 12px 18px; border-radius: 4px; border: 1px solid var(--bezel);
+  background: var(--panel); color: var(--bone); cursor:pointer; transition: all 120ms ease;
+}
+button:hover{ border-color: var(--bone-dim); }
+button:active{ transform: translateY(1px); }
+button:disabled{ opacity:0.35; cursor:not-allowed; }
+button.primary{ background: var(--phosphor-dim); border-color: var(--phosphor-dim); color: #04180a; flex: 1.3; }
+button.primary:hover{ background: var(--phosphor); border-color: var(--phosphor); }
+button.stop{ border-color: var(--red); color: var(--red); }
+button.stop:hover{ background: rgba(228,68,46,0.1); }
+
+button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible{
+  outline: 2px solid var(--amber); outline-offset: 2px;
+}
+
+footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); letter-spacing: 0.1em; }
+
+@media (prefers-reduced-motion: reduce){ .meter-bars i{ transition: none; } }
+</style>
+</head>
+<body>
+<div class="set">
+
+  <div class="callsign">
+    <h1>NUMBERS<span>·</span>READER</h1>
+    <div class="freq" id="clock">— — : — —</div>
+  </div>
+
+  <div class="cabinet">
+
+    <div class="meter-wrap">
+      <div class="meter-label"><span>SIGNAL</span><span id="statusText">STANDBY</span></div>
+      <div class="meter-bars" id="meterBars"></div>
+      <div class="readout idle" id="readout">awaiting traffic</div>
+    </div>
+
+    <label class="field-label" for="numbers">paste numbers</label>
+    <textarea id="numbers" placeholder="e.g. 40928 17364 55210" spellcheck="false"></textarea>
+    <div class="grouped-preview" id="preview"></div>
+
+    <div class="mode-switch">
+      <div class="mode-btn active" id="modeBrowser" data-mode="browser">browser voices</div>
+      <div class="mode-btn" id="modeCustom" data-mode="custom">custom audio clips</div>
+    </div>
+
+    <div class="clip-panel" id="clipPanel" style="display:none;">
+
+      <div class="pack-bar">
+        <select id="packSelect"></select>
+        <input type="text" id="newPackName" placeholder="new pack name">
+        <button id="addPackBtn">+ new pack</button>
+        <button id="deletePackBtn">delete pack</button>
+      </div>
+
+      <div class="pack-bar">
+        <label class="imp-label" for="bulkImport">⇪ import files to this pack</label>
+        <input type="file" id="bulkImport" multiple accept="audio/*">
+        <button id="clearClips">clear this pack</button>
+      </div>
+      <div class="import-hint">
+        bulk import matches filenames to slots automatically — name files like
+        <code>0.mp3</code> … <code>9.mp3</code>, <code>attention.mp3</code>, <code>end.mp3</code>
+        (case-insensitive, extension ignored). unmatched files are skipped.
+      </div>
+
+      <div class="clip-grid" id="clipGrid"></div>
+      <div class="clip-actions">
+        <span class="clip-hint" id="clipHint">upload a short clip for each digit you plan to use</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl" id="voiceCtrl">
+        <label class="field-label" for="voiceSelect">voice</label>
+        <select id="voiceSelect"></select>
+      </div>
+
+      <div class="ctrl">
+        <label class="field-label" for="groupSize">group size</label>
+        <input type="number" id="groupSize" min="1" max="20" value="5">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label class="field-label" for="rate">rate</label><span class="val" id="rateVal">0.85</span></div>
+        <input type="range" id="rate" min="0.4" max="1.6" step="0.05" value="0.85">
+      </div>
+
+      <div class="ctrl" id="pitchCtrl">
+        <div class="row"><label class="field-label" for="pitch">pitch <span style="opacity:.6">(voices only)</span></label><span class="val" id="pitchVal">1.0</span></div>
+        <input type="range" id="pitch" min="0" max="2" step="0.05" value="1">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label class="field-label" for="volume">volume</label><span class="val" id="volumeVal">1.0</span></div>
+        <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
+      </div>
+
+      <div class="ctrl" id="digitGapCtrl" style="display:none;">
+        <div class="row"><label class="field-label" for="digitGap">gap between digits</label><span class="val" id="digitGapVal">150ms</span></div>
+        <input type="range" id="digitGap" min="0" max="1000" step="25" value="150">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label class="field-label" for="pause">pause between groups</label><span class="val" id="pauseVal">600ms</span></div>
+        <input type="range" id="pause" min="0" max="2000" step="50" value="600">
+      </div>
+
+      <div class="ctrl">
+        <div class="row"><label class="field-label" for="repeats">repeat message</label><span class="val" id="repeatsVal">1×</span></div>
+        <input type="range" id="repeats" min="1" max="5" step="1" value="1">
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <label class="toggle" id="digitModeToggle"><input type="checkbox" id="digitMode" checked> read digits individually</label>
+      <label class="toggle"><input type="checkbox" id="preamble" checked> intro / outro phrases</label>
+    </div>
+
+    <div class="transport">
+      <button class="primary" id="playBtn">▶ transmit</button>
+      <button id="pauseBtn" disabled>‖ hold</button>
+      <button class="stop" id="stopBtn" disabled>■ end</button>
+    </div>
+
+  </div>
+
+  <footer>VOICE MODE USES YOUR BROWSER'S BUILT-IN VOICES · CLIP MODE PLAYS FILES YOU IMPORT · NOTHING LEAVES YOUR BROWSER · PACKS RESET ON RELOAD</footer>
+</div>
+
+<script>
+const numbersEl = document.getElementById('numbers');
+const previewEl = document.getElementById('preview');
+const voiceSelect = document.getElementById('voiceSelect');
+const voiceCtrl = document.getElementById('voiceCtrl');
+const pitchCtrl = document.getElementById('pitchCtrl');
+const digitGapCtrl = document.getElementById('digitGapCtrl');
+const digitModeToggle = document.getElementById('digitModeToggle');
+const groupSizeEl = document.getElementById('groupSize');
+const rateEl = document.getElementById('rate');
+const pitchEl = document.getElementById('pitch');
+const volumeEl = document.getElementById('volume');
+const pauseEl = document.getElementById('pause');
+const digitGapEl = document.getElementById('digitGap');
+const repeatsEl = document.getElementById('repeats');
+const digitModeEl = document.getElementById('digitMode');
+const preambleEl = document.getElementById('preamble');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const readout = document.getElementById('readout');
+const statusText = document.getElementById('statusText');
+const meterBars = document.getElementById('meterBars');
+const clockEl = document.getElementById('clock');
+const modeBrowser = document.getElementById('modeBrowser');
+const modeCustom = document.getElementById('modeCustom');
+const clipPanel = document.getElementById('clipPanel');
+const clipGrid = document.getElementById('clipGrid');
+const clipHint = document.getElementById('clipHint');
+const clearClipsBtn = document.getElementById('clearClips');
+const packSelect = document.getElementById('packSelect');
+const newPackName = document.getElementById('newPackName');
+const addPackBtn = document.getElementById('addPackBtn');
+const deletePackBtn = document.getElementById('deletePackBtn');
+const bulkImport = document.getElementById('bulkImport');
+
+const rateVal = document.getElementById('rateVal');
+const pitchVal = document.getElementById('pitchVal');
+const volumeVal = document.getElementById('volumeVal');
+const pauseVal = document.getElementById('pauseVal');
+const digitGapVal = document.getElementById('digitGapVal');
+const repeatsVal = document.getElementById('repeatsVal');
+
+const digitWords = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+let mode = 'browser'; // 'browser' | 'custom'
+
+const slotDefs = [
+  {key:'0',label:'0'},{key:'1',label:'1'},{key:'2',label:'2'},{key:'3',label:'3'},
+  {key:'4',label:'4'},{key:'5',label:'5'},{key:'6',label:'6'},{key:'7',label:'7'},
+  {key:'8',label:'8'},{key:'9',label:'9'},{key:'attention',label:'ATTN'},{key:'end',label:'END'}
+];
+const slotKeySet = new Set(slotDefs.map(d=>d.key));
+
+// ---------- pack storage: packs[name] = { key: {url, name} } ----------
+const packs = { 'Default': {} };
+let activePack = 'Default';
+
+function refreshPackSelect(){
+  packSelect.innerHTML = '';
+  Object.keys(packs).forEach(name=>{
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    if(name === activePack) o.selected = true;
+    packSelect.appendChild(o);
+  });
+}
+refreshPackSelect();
+
+// ---------- built-in packs from voices/manifest.json (for GitHub Pages hosting) ----------
+async function loadManifest(){
+  try{
+    const res = await fetch('voices/manifest.json', { cache: 'no-store' });
+    if(!res.ok) return;
+    const data = await res.json();
+    const manifestNames = Object.keys(data);
+
+    manifestNames.forEach(packName=>{
+      if(!packs[packName]) packs[packName] = {};
+      Object.entries(data[packName]).forEach(([key, path])=>{
+        if(slotKeySet.has(key)){
+          packs[packName][key] = { url: path, name: path.split('/').pop(), builtIn: true };
+        }
+      });
+    });
+
+    // if nothing has been manually loaded into Default, jump straight to the first bundled pack
+    if(manifestNames.length && Object.keys(packs['Default']).length === 0){
+      switchPack(manifestNames[0]);
+    } else {
+      refreshPackSelect();
+    }
+  } catch(e){
+    // no manifest.json present (or fetch blocked, e.g. opening the file directly) — app still works fine manually
+  }
+}
+loadManifest();
+
+// ---------- meter ----------
+const BAR_COUNT = 28;
+for(let i=0;i<BAR_COUNT;i++){ meterBars.appendChild(document.createElement('i')); }
+function setMeter(active, level){
+  meterBars.classList.toggle('live', active);
+  const bars = meterBars.children;
+  for(let i=0;i<bars.length;i++){
+    bars[i].style.height = active ? (15 + Math.random()*level*85)+'%' : '15%';
+  }
+}
+let meterInterval = null;
+function startMeter(){ stopMeter(); meterInterval = setInterval(()=> setMeter(true, 0.9), 90); }
+function stopMeter(){ if(meterInterval){ clearInterval(meterInterval); meterInterval = null; } setMeter(false, 0); }
+
+// ---------- clock ----------
+function tickClock(){
+  const d = new Date();
+  clockEl.textContent = String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC';
+}
+tickClock();
+setInterval(tickClock, 1000*15);
+
+// ---------- voices ----------
+let voices = [];
+function loadVoices(){
+  voices = window.speechSynthesis.getVoices();
+  voiceSelect.innerHTML = '';
+  if(voices.length === 0){
+    const o = document.createElement('option');
+    o.textContent = 'no voices found';
+    voiceSelect.appendChild(o);
+    return;
+  }
+  voices.forEach((v, i)=>{
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = v.name + ' (' + v.lang + ')' + (v.default ? ' — default' : '');
+    voiceSelect.appendChild(o);
+  });
+  const enIdx = voices.findIndex(v => v.lang && v.lang.startsWith('en'));
+  if(enIdx >= 0) voiceSelect.value = enIdx;
+}
+loadVoices();
+if('onvoiceschanged' in window.speechSynthesis){ window.speechSynthesis.onvoiceschanged = loadVoices; }
+
+// ---------- clip slot grid (renders whichever pack is active) ----------
+slotDefs.forEach(def=>{
+  const slot = document.createElement('div');
+  slot.className = 'clip-slot';
+  slot.id = 'slot-'+def.key;
+  slot.innerHTML = `
+    <div class="key">${def.label}</div>
+    <div class="status" id="status-${def.key}">empty</div>
+    <div class="name" id="name-${def.key}"></div>
+    <label class="upload-btn" for="file-${def.key}">upload</label>
+    <input type="file" id="file-${def.key}" accept="audio/*">
+    <button class="preview-btn" id="preview-${def.key}" style="display:none;">▶ test</button>
+  `;
+  clipGrid.appendChild(slot);
+
+  const fileInput = slot.querySelector('#file-'+def.key);
+  const previewBtn = slot.querySelector('#preview-'+def.key);
+
+  fileInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    assignClip(activePack, def.key, file);
+    e.target.value = '';
+  });
+
+  previewBtn.addEventListener('click', ()=>{
+    const entry = packs[activePack][def.key];
+    if(!entry) return;
+    const a = new Audio(entry.url);
+    a.volume = parseFloat(volumeEl.value);
+    a.play();
+  });
+});
+
+function assignClip(packName, key, file){
+  const pack = packs[packName];
+  if(pack[key] && pack[key].url && pack[key].url.startsWith('blob:')) URL.revokeObjectURL(pack[key].url);
+  pack[key] = { url: URL.createObjectURL(file), name: file.name };
+  if(packName === activePack) renderSlot(key);
+  updatePreview();
+}
+
+function renderSlot(key){
+  const entry = packs[activePack][key];
+  const slotEl = document.getElementById('slot-'+key);
+  const statusEl = document.getElementById('status-'+key);
+  const nameEl = document.getElementById('name-'+key);
+  const previewBtn = document.getElementById('preview-'+key);
+  if(entry){
+    slotEl.classList.add('loaded');
+    statusEl.textContent = 'loaded';
+    nameEl.textContent = entry.name;
+    previewBtn.style.display = 'block';
+  } else {
+    slotEl.classList.remove('loaded');
+    statusEl.textContent = 'empty';
+    nameEl.textContent = '';
+    previewBtn.style.display = 'none';
+  }
+}
+
+function renderAllSlots(){
+  slotDefs.forEach(def => renderSlot(def.key));
+}
+
+// ---------- bulk import ----------
+function baseName(filename){
+  const noExt = filename.replace(/\.[^/.]+$/, '');
+  return noExt.trim().toLowerCase();
+}
+bulkImport.addEventListener('change', (e)=>{
+  const files = Array.from(e.target.files || []);
+  let matched = 0, skipped = 0;
+  files.forEach(file=>{
+    const base = baseName(file.name);
+    let key = null;
+    if(slotKeySet.has(base)) key = base;
+    else if(base.startsWith('digit')){ const d = base.replace(/\D/g,''); if(slotKeySet.has(d)) key = d; }
+    else if(base.includes('atten')) key = 'attention';
+    else if(base.includes('end')) key = 'end';
+
+    if(key){ assignClip(activePack, key, file); matched++; }
+    else skipped++;
+  });
+  clipHint.textContent = `imported ${matched} clip(s)` + (skipped ? `, skipped ${skipped} unmatched file(s)` : '');
+  clipHint.classList.remove('warn');
+  e.target.value = '';
+});
+
+// ---------- pack management ----------
+function switchPack(name){
+  activePack = name;
+  refreshPackSelect();
+  renderAllSlots();
+  updatePreview();
+}
+packSelect.addEventListener('change', ()=> switchPack(packSelect.value));
+
+addPackBtn.addEventListener('click', ()=>{
+  let name = newPackName.value.trim();
+  if(!name) name = 'Pack ' + (Object.keys(packs).length + 1);
+  if(packs[name]){ clipHint.textContent = 'a pack named "'+name+'" already exists'; clipHint.classList.add('warn'); return; }
+  packs[name] = {};
+  newPackName.value = '';
+  switchPack(name);
+});
+
+deletePackBtn.addEventListener('click', ()=>{
+  const names = Object.keys(packs);
+  if(names.length <= 1){ clipHint.textContent = 'at least one pack must remain'; clipHint.classList.add('warn'); return; }
+  Object.values(packs[activePack]).forEach(entry => { if(entry.url.startsWith('blob:')) URL.revokeObjectURL(entry.url); });
+  delete packs[activePack];
+  switchPack(Object.keys(packs)[0]);
+});
+
+clearClipsBtn.addEventListener('click', ()=>{
+  Object.values(packs[activePack]).forEach(entry => { if(entry.url.startsWith('blob:')) URL.revokeObjectURL(entry.url); });
+  packs[activePack] = {};
+  renderAllSlots();
+  updatePreview();
+});
+
+// ---------- mode switch ----------
+function setMode(m){
+  mode = m;
+  modeBrowser.classList.toggle('active', m === 'browser');
+  modeCustom.classList.toggle('active', m === 'custom');
+  clipPanel.style.display = m === 'custom' ? 'block' : 'none';
+  voiceCtrl.classList.toggle('disabled', m === 'custom');
+  pitchCtrl.classList.toggle('disabled', m === 'custom');
+  digitGapCtrl.style.display = m === 'custom' ? 'block' : 'none';
+  if(m === 'custom'){
+    digitModeEl.checked = true;
+    digitModeEl.disabled = true;
+    digitModeToggle.classList.add('disabled');
+  } else {
+    digitModeEl.disabled = false;
+    digitModeToggle.classList.remove('disabled');
+  }
+  updatePreview();
+}
+modeBrowser.addEventListener('click', ()=> setMode('browser'));
+modeCustom.addEventListener('click', ()=> setMode('custom'));
+
+// ---------- grouping + preview ----------
+function digitsOnly(str){ return (str.match(/\d/g) || []).join(''); }
+function groupString(digits, size){
+  const groups = [];
+  for(let i=0;i<digits.length;i+=size){ groups.push(digits.slice(i, i+size)); }
+  return groups;
+}
+function updatePreview(){
+  const digits = digitsOnly(numbersEl.value);
+  const size = Math.max(1, parseInt(groupSizeEl.value) || 5);
+  if(!digits){ previewEl.textContent = ''; return; }
+  previewEl.textContent = groupString(digits, size).join('  ·  ');
+
+  if(mode === 'custom'){
+    const needed = [...new Set(digits.split(''))];
+    const missing = needed.filter(d => !packs[activePack][d]);
+    if(missing.length){
+      clipHint.textContent = 'missing clips for: ' + missing.join(', ');
+      clipHint.classList.add('warn');
+    } else {
+      clipHint.textContent = 'all digits in your message have clips loaded';
+      clipHint.classList.remove('warn');
+    }
+  }
+}
+numbersEl.addEventListener('input', updatePreview);
+groupSizeEl.addEventListener('input', updatePreview);
+
+// ---------- slider labels ----------
+rateEl.addEventListener('input', ()=> rateVal.textContent = parseFloat(rateEl.value).toFixed(2));
+pitchEl.addEventListener('input', ()=> pitchVal.textContent = parseFloat(pitchEl.value).toFixed(2));
+volumeEl.addEventListener('input', ()=> volumeVal.textContent = parseFloat(volumeEl.value).toFixed(2));
+pauseEl.addEventListener('input', ()=> pauseVal.textContent = pauseEl.value + 'ms');
+digitGapEl.addEventListener('input', ()=> digitGapVal.textContent = digitGapEl.value + 'ms');
+repeatsEl.addEventListener('input', ()=> repeatsVal.textContent = repeatsEl.value + '×');
+
+// ---------- build playback queue ----------
+function buildQueue(){
+  const digits = digitsOnly(numbersEl.value);
+  const size = Math.max(1, parseInt(groupSizeEl.value) || 5);
+  const groups = groupString(digits, size);
+  const repeats = parseInt(repeatsEl.value) || 1;
+  const digitMode = digitModeEl.checked || mode === 'custom';
+  const usePreamble = preambleEl.checked;
+  const groupPause = parseInt(pauseEl.value) || 0;
+  const gap = parseInt(digitGapEl.value) || 0;
+  const activeClips = packs[activePack];
+
+  const items = [];
+
+  function pushPhrase(key, text){
+    if(mode === 'custom'){
+      if(activeClips[key]) items.push({kind:'audio', url: activeClips[key].url, label: text, pauseAfter: 400});
+    } else {
+      items.push({kind:'tts', text, label: text, pauseAfter: 400});
+    }
+  }
+
+  for(let r=0; r<repeats; r++){
+    if(usePreamble) pushPhrase('attention', 'Attention. Attention.');
+
+    groups.forEach(g=>{
+      if(mode === 'custom'){
+        const digitsArr = g.split('');
+        digitsArr.forEach((d, i)=>{
+          if(activeClips[d]){
+            items.push({kind:'audio', url: activeClips[d].url, label: d, pauseAfter: i === digitsArr.length-1 ? groupPause : gap});
+          }
+        });
+      } else if(digitMode){
+        items.push({kind:'tts', text: g.split('').map(d=>digitWords[parseInt(d)]).join(', '), label: g, pauseAfter: groupPause});
+      } else {
+        items.push({kind:'tts', text: g, label: g, pauseAfter: groupPause});
+      }
+    });
+
+    if(usePreamble) pushPhrase('end', 'End of message.');
+  }
+  return items;
+}
+
+// ---------- playback engine ----------
+let queue = [];
+let queueIndex = 0;
+let stopRequested = false;
+let pauseRequested = false;
+let currentAudioEl = null;
+let isPlayingFlag = false;
+
+function setUiPlaying(playing){
+  isPlayingFlag = playing;
+  playBtn.disabled = playing;
+  pauseBtn.disabled = !playing;
+  stopBtn.disabled = !playing;
+  statusText.textContent = playing ? 'TRANSMITTING' : 'STANDBY';
+  readout.classList.toggle('idle', !playing);
+  if(playing) startMeter(); else stopMeter();
+}
+
+function sleep(ms){
+  return new Promise(resolve=>{
+    const step = 80;
+    let elapsed = 0;
+    const iv = setInterval(()=>{
+      if(stopRequested){ clearInterval(iv); resolve(); return; }
+      if(!pauseRequested){ elapsed += step; }
+      if(elapsed >= ms){ clearInterval(iv); resolve(); }
+    }, step);
+  });
+}
+
+function playAudioItem(item){
+  return new Promise(resolve=>{
+    const a = new Audio(item.url);
+    a.playbackRate = parseFloat(rateEl.value);
+    a.volume = parseFloat(volumeEl.value);
+    currentAudioEl = a;
+    a.onended = ()=>{ currentAudioEl = null; resolve(); };
+    a.onerror = ()=>{ currentAudioEl = null; resolve(); };
+    a.play().catch(()=>{ currentAudioEl = null; resolve(); });
+  });
+}
+
+function playTtsItem(item){
+  return new Promise(resolve=>{
+    const utter = new SpeechSynthesisUtterance(item.text);
+    const vIdx = voiceSelect.value;
+    if(voices[vIdx]) utter.voice = voices[vIdx];
+    utter.rate = parseFloat(rateEl.value);
+    utter.pitch = parseFloat(pitchEl.value);
+    utter.volume = parseFloat(volumeEl.value);
+    utter.onend = resolve;
+    utter.onerror = resolve;
+    window.speechSynthesis.speak(utter);
+  });
+}
+
+async function runQueue(){
+  while(queueIndex < queue.length){
+    if(stopRequested) break;
+    while(pauseRequested && !stopRequested){ await sleep(100); }
+    if(stopRequested) break;
+
+    const item = queue[queueIndex];
+    readout.textContent = item.kind === 'audio' ? ('clip  ' + item.label) : item.text.toLowerCase();
+
+    if(item.kind === 'audio') await playAudioItem(item);
+    else await playTtsItem(item);
+
+    if(stopRequested) break;
+    if(item.pauseAfter) await sleep(item.pauseAfter);
+    queueIndex++;
+  }
+  finishPlayback();
+}
+
+function finishPlayback(){
+  setUiPlaying(false);
+  readout.textContent = 'awaiting traffic';
+  statusText.textContent = 'STANDBY';
+  pauseBtn.textContent = '‖ hold';
+  pauseRequested = false;
+}
+
+playBtn.addEventListener('click', ()=>{
+  const digits = digitsOnly(numbersEl.value);
+  if(!digits){ readout.textContent = 'no digits found in input'; return; }
+
+  if(mode === 'custom'){
+    const needed = [...new Set(digits.split(''))];
+    const missing = needed.filter(d => !packs[activePack][d]);
+    if(missing.length){ readout.textContent = 'missing clips for: ' + missing.join(', '); return; }
+  }
+
+  window.speechSynthesis.cancel();
+  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
+
+  queue = buildQueue();
+  queueIndex = 0;
+  stopRequested = false;
+  pauseRequested = false;
+  setUiPlaying(true);
+  runQueue();
+});
+
+pauseBtn.addEventListener('click', ()=>{
+  if(!isPlayingFlag) return;
+  if(!pauseRequested){
+    pauseRequested = true;
+    if(mode === 'browser') window.speechSynthesis.pause();
+    if(currentAudioEl) currentAudioEl.pause();
+    pauseBtn.textContent = '▶ resume';
+    statusText.textContent = 'HOLDING';
+    stopMeter();
+  } else {
+    pauseRequested = false;
+    if(mode === 'browser') window.speechSynthesis.resume();
+    if(currentAudioEl) currentAudioEl.play();
+    pauseBtn.textContent = '‖ hold';
+    statusText.textContent = 'TRANSMITTING';
+    startMeter();
+  }
+});
+
+stopBtn.addEventListener('click', ()=>{
+  stopRequested = true;
+  pauseRequested = false;
+  window.speechSynthesis.cancel();
+  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
+  finishPlayback();
+});
+</script>
+</body>
+</html>
