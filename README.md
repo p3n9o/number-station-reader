@@ -8,3 +8,5 @@ German G02 and alternative G02-2 voice line variant
 
 Access preset files on the github project site:
 https://p3n9o.github.io/number-station-reader/
+
+Thanks Claude :)
