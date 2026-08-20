@@ -206,6 +206,75 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-
 footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); letter-spacing: 0.1em; }
 
 @media (prefers-reduced-motion: reduce){ .meter-bars i{ transition: none; } }
+
+/* ---- radio link (G90 CAT / PTT / audio) ---- */
+.status-strip{ display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0 18px; }
+.status-chip{
+  display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid var(--bezel);
+  border-radius:3px; background: var(--panel); font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.06em; color: var(--bone-dim);
+}
+.dot{ width:7px; height:7px; border-radius:50%; background:#4a4a4a; flex:none; }
+.dot.on{ background: var(--phosphor); box-shadow: 0 0 6px var(--phosphor); }
+.dot.warn{ background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.dot.off{ background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+.radio-panel{ border: 1px solid var(--bezel); border-radius: 4px; padding: 14px; background: #0d0f0a; margin-top: 10px; }
+.radio-panel + .radio-panel{ margin-top: 12px; }
+.radio-panel h4{
+  margin: 0 0 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--bone-dim); display:flex; align-items:center; gap:8px;
+}
+.radio-panel h4::after{ content:""; flex:1; height:1px; background: var(--bezel); }
+
+.radio-btn{
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; color: var(--bone);
+  background: var(--panel); border: 1px solid var(--bezel); border-radius: 4px;
+  padding: 9px 11px; cursor:pointer; width:100%; text-align:left;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  transition: border-color 120ms ease, color 120ms ease; margin-bottom: 8px;
+}
+.radio-btn:hover{ border-color: var(--phosphor-dim); color: var(--phosphor); }
+.radio-btn:last-child{ margin-bottom:0; }
+.radio-btn small{ color: var(--bone-dim); font-size: 9px; }
+.radio-btn.connected{ border-color: var(--phosphor-dim); color: var(--phosphor); background: rgba(57,255,106,0.06); }
+
+.radio-row{ display:flex; gap:8px; }
+.radio-row > *{ flex:1; }
+
+.vfo-readout{
+  font-family: var(--mono); text-align:right; background:#050603; border:1px solid var(--bezel);
+  border-radius:4px; padding:10px 12px; margin-bottom:10px;
+}
+.vfo-readout .hz{ font-size:22px; font-weight:700; color: var(--phosphor); letter-spacing:0.02em; }
+.vfo-readout .unit{ font-size:11px; color: var(--bone-dim); margin-left:4px; }
+.vfo-readout .mode-row{ display:flex; justify-content:space-between; margin-top:5px; font-size:10px; color: var(--bone-dim); }
+
+.radio-field{ display:block; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); letter-spacing: 0.05em; text-transform: uppercase; margin: 10px 0 6px; }
+.radio-field:first-child{ margin-top:0; }
+.radio-field .val{ color: var(--amber); float:right; text-transform:none; }
+.radio-panel select, .radio-panel input[type=text], .radio-panel input[type=number]{
+  width:100%; font-family: var(--mono); font-size: 12px; background:#050603; border:1px solid var(--bezel);
+  color: var(--bone); padding:7px 8px; border-radius:4px;
+}
+.radio-panel input[type=range]{ width:100%; accent-color: var(--amber); }
+
+.on-air-toggle{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 10px 12px;
+  border: 1px solid var(--bezel); border-radius:4px; margin: 12px 0; background: var(--panel);
+}
+.on-air-toggle.armed{ border-color: var(--red); background: rgba(228,68,46,0.08); }
+.on-air-toggle label{ font-family: var(--mono); font-size: 11px; letter-spacing:0.06em; color: var(--bone); cursor:pointer; display:flex; align-items:center; gap:9px; }
+.on-air-toggle input{ accent-color: var(--red); width:16px; height:16px; }
+.on-air-toggle .tag{ font-family: var(--mono); font-size:9px; padding:2px 7px; border-radius:8px; border:1px solid var(--bezel); color: var(--bone-dim); letter-spacing:0.08em; }
+.on-air-toggle.armed .tag{ border-color: var(--red); color: var(--red); }
+
+#btnPanicRelease{ display:none; border-color: var(--red); color: var(--red); width:100%; margin-top:8px; }
+#btnPanicRelease:hover{ background: rgba(228,68,46,0.1); }
+
+.radio-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); line-height:1.6; margin-top:8px; }
+.radio-hint.warn{ color: var(--amber); }
+.radio-warning{ background:#2a1512; border:1px solid #5c2b23; color:#ffb4a8; font-family: var(--mono); font-size:10px; padding:9px 11px; border-radius:4px; margin-bottom:10px; line-height:1.5; display:none; }
 </style>
 </head>
 <body>
@@ -215,6 +284,13 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
     <h1>NUMBERS<span>·</span>READER</h1>
     <div class="freq" id="clock">— — : — —</div>
   </div>
+
+  <div class="status-strip">
+    <div class="status-chip"><span class="dot" id="dotCat"></span>CAT</div>
+    <div class="status-chip"><span class="dot" id="dotPtt"></span>PTT</div>
+    <div class="status-chip"><span class="dot" id="dotAudioOut"></span>RADIO AUDIO OUT</div>
+  </div>
+  <div class="radio-warning" id="radioBrowserWarning">⚠ This browser doesn't expose Web Serial and/or WebHID. Use a Chromium-based desktop browser (Chrome, Edge, Opera) over HTTPS to connect a real G90. Local browser-voice / clip playback still works without it.</div>
 
   <div class="cabinet">
 
@@ -259,6 +335,102 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
       </details>
       <div class="spectro-note" id="spectroNote">live analysis of playing audio · scrolls left to right, low freq at bottom</div>
     </div>
+
+    <details class="theme-collapse" id="radioLinkDetails">
+      <summary><span class="chev">▸</span><span>radio link — G90 CAT / PTT / audio</span><span class="current" id="radioLinkCurrent">not connected</span></summary>
+
+      <div class="radio-panel">
+        <h4>Connections</h4>
+        <button class="radio-btn" id="btnCat">Connect CAT (Web Serial)<small id="catState">not connected</small></button>
+        <button class="radio-btn" id="btnHid">Connect PTT interface (WebHID)<small id="hidState">not connected</small></button>
+        <button class="radio-btn" id="btnRadioAudio">Connect radio audio out<small id="audioOutState">not connected</small></button>
+        <div class="radio-hint">Only one application can hold the CAT port or audio device at a time — close WSJT-X / SDR Console / OmniRig before connecting here, or bridge through <code>rigctld</code>. RTS/DTR are forced low the instant CAT connects so opening the port can't itself key the transmitter.</div>
+      </div>
+
+      <div class="radio-panel">
+        <h4>VFO</h4>
+        <div class="vfo-readout">
+          <div><span class="hz" id="vfoHz">— — . — — — . — —</span><span class="unit">MHz</span></div>
+          <div class="mode-row"><span id="vfoMode">MODE —</span><span id="vfoRxTx">RX</span></div>
+        </div>
+        <div class="radio-row">
+          <input type="text" id="freqSet" placeholder="e.g. 14.074000">
+          <button id="btnSetFreq" style="flex:0 0 auto;">SET</button>
+        </div>
+        <button class="radio-btn" id="btnReadFreq" style="justify-content:center;margin-top:8px;">↻ Read frequency from rig</button>
+      </div>
+
+      <div class="on-air-toggle" id="onAirToggle">
+        <label><input type="checkbox" id="txToRadioToggle"><span>Key radio PTT &amp; transmit audio to G90</span></label>
+        <span class="tag" id="onAirTag">OFF</span>
+      </div>
+      <div class="radio-hint warn" id="radioModeHint">Browser voices can't be captured by the page's audio engine, so they can only be sent over the air in <b>custom audio clips</b> mode — switch modes above to key the rig for real transmission. With this off, playback stays local (monitor only).</div>
+      <button class="radio-btn" id="btnPanicRelease">⏹ Force PTT release</button>
+
+      <div class="radio-panel">
+        <h4>Drive &amp; PTT method</h4>
+        <label class="radio-field">Mic / drive gain fed to radio <span class="val" id="driveVal">20%</span></label>
+        <input type="range" id="driveSlider" min="0" max="100" value="20">
+        <label class="radio-field">PTT method</label>
+        <select id="pttMethod">
+          <option value="cat" selected>CI-V command (1C 00 — rig TX on/off)</option>
+          <option value="rts">Serial RTS line (hardware PTT)</option>
+          <option value="dtr">Serial DTR line (hardware PTT)</option>
+          <option value="hid">WebHID GPIO (experimental, unconfirmed on DE-19)</option>
+        </select>
+        <label class="radio-field">HID GPIO bit for PTT (if using WebHID)</label>
+        <select id="cm108Bit">
+          <option value="1">GPIO 1 (0x01)</option>
+          <option value="2" selected>GPIO 2 (0x02)</option>
+          <option value="3">GPIO 3 (0x04)</option>
+          <option value="4">GPIO 4 (0x08)</option>
+        </select>
+        <div class="radio-hint">The G90 speaks Icom CI-V (behaves as an IC-7100/IC-756PRO clone) — default rig address <b>70</b>, controller <b>E0</b>, 19200 baud. If CI-V PTT doesn't key the rig, try the RTS/DTR options instead.</div>
+      </div>
+
+      <div class="radio-panel">
+        <h4>CAT settings</h4>
+        <div class="radio-row">
+          <div>
+            <label class="radio-field">Baud rate</label>
+            <select id="catBaud">
+              <option value="4800">4800</option>
+              <option value="9600">9600</option>
+              <option value="19200" selected>19200 (G90 default)</option>
+              <option value="38400">38400</option>
+            </select>
+          </div>
+          <div>
+            <label class="radio-field">Framing</label>
+            <select id="catFraming">
+              <option value="8n1" selected>8N1</option>
+              <option value="8n2">8N2</option>
+            </select>
+          </div>
+        </div>
+        <div class="radio-row">
+          <div>
+            <label class="radio-field">CI-V rig address</label>
+            <input type="text" id="civTo" value="70">
+          </div>
+          <div>
+            <label class="radio-field">CI-V controller address</label>
+            <input type="text" id="civFrom" value="E0">
+          </div>
+        </div>
+        <div class="radio-hint warn">Xiegu's own CAT guide notes that leaving a polling CAT program connected and then power-cycling the G90 can be misread as the firmware-update key combo — disconnect CAT when you're done.</div>
+      </div>
+
+      <div class="radio-panel">
+        <h4>Audio output device</h4>
+        <label class="radio-field">Output (to G90 / DE-19 mic-data input)</label>
+        <select id="audioOutSelect"><option value="">Connect radio audio first…</option></select>
+        <button class="radio-btn" id="btnRefreshAudioDevices" style="margin-top:8px;justify-content:center;">↻ Refresh device list</button>
+        <div class="radio-hint">Uses <code>setSinkId</code>, supported in Chromium browsers. Pick your G90 audio interface explicitly on multi-soundcard machines. Getting a labelled device list requires briefly granting microphone permission — no audio is captured or sent anywhere from that mic.</div>
+      </div>
+
+      <div class="radio-hint">Check your amateur licence conditions and band plan before keying up. This page runs entirely client-side — nothing leaves your browser except what the radio itself transmits.</div>
+    </details>
 
     <label class="field-label" for="numbers">paste numbers</label>
     <textarea id="numbers" placeholder="e.g. 40928 17364 55210" spellcheck="false"></textarea>
@@ -665,6 +837,7 @@ function ensureAudioCtx(){
 }
 
 const analysedElements = new WeakSet();
+let analyserConnectedToSpeaker = false;
 function connectAnalyserSource(audioEl){
   if(mode !== 'custom') return;
   if(!ensureAudioCtx()) return;
@@ -672,13 +845,335 @@ function connectAnalyserSource(audioEl){
   try{
     const src = audioCtx.createMediaElementSource(audioEl);
     src.connect(analyser);
-    analyser.connect(audioCtx.destination);
+    if(!analyserConnectedToSpeaker){
+      analyser.connect(audioCtx.destination);
+      analyserConnectedToSpeaker = true;
+    }
+    // If a G90 audio output has been connected, the exact same signal that
+    // feeds the local monitor speaker/spectrogram is also routed to the
+    // radio's mic/data input — this is what actually goes out over the air.
+    connectAnalyserToRadioOut();
     analysedElements.add(audioEl);
   } catch(e){
     // some browsers restrict this for cross-origin sources; the clip will still
     // play normally through the audio element itself, just without a live trace
   }
 }
+
+// =====================================================================
+// RADIO LINK — G90 CAT (Web Serial / Icom CI-V) + PTT (CAT/RTS/DTR/WebHID)
+// + audio-out routing (Web Audio -> setSinkId), ported from the SHACK-90
+// waterfall console so numbers-group audio can be keyed straight out to a
+// real Xiegu G90 instead of (or alongside) the local monitor speaker.
+// =====================================================================
+const R = {
+  port:null, catWriter:null, catReader:null,
+  hid:null, cm108Bit:2,
+  outEl:null, outDest:null, radioOutConnected:false,
+  drive:0.2,
+  pttMethod:'cat',
+  frequencyHz:14074000,
+  pttEngaged:false, pttSafetyTimer:null,
+};
+const PTT_SAFETY_MS = 120000; // hard auto-release after 2 min no matter what
+
+const $r = id => document.getElementById(id);
+const hasSerial = 'serial' in navigator;
+const hasHid = 'hid' in navigator;
+if(!hasSerial || !hasHid){ $r('radioBrowserWarning').style.display = 'block'; }
+
+function setDot(id, state){ // 'off' | 'warn' | 'on'
+  const d = $r(id);
+  if(!d) return;
+  d.classList.remove('on','warn','off');
+  if(state) d.classList.add(state);
+}
+
+function updateRadioLinkSummary(){
+  const bits = [];
+  if(R.catWriter) bits.push('CAT');
+  if(R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') bits.push('PTT');
+  if(R.radioOutConnected) bits.push('AUDIO');
+  $r('radioLinkCurrent').textContent = bits.length ? bits.join(' · ')+' linked' : 'not connected';
+}
+
+// ---- CAT control (Icom CI-V) ----
+function civFreqBytes(hz){
+  let f = Math.round(hz);
+  const out = new Uint8Array(5);
+  for(let i=0;i<5;i++){ out[i] = ((f % 10) << 4) | (Math.floor(f/10) % 10); f = Math.floor(f/100); }
+  return out;
+}
+function civFrame(cmd, data){
+  const to = parseInt($r('civTo').value, 16) || 0x70;
+  const from = parseInt($r('civFrom').value, 16) || 0xE0;
+  return [0xFE,0xFE, to, from, ...(Array.isArray(cmd)?cmd:[cmd]), ...(data||[]), 0xFD];
+}
+
+async function connectCAT(){
+  if(!hasSerial){ alert('Web Serial is not available in this browser.'); return; }
+  try{
+    const port = await navigator.serial.requestPort();
+    const framing = $r('catFraming').value;
+    await port.open({
+      baudRate: parseInt($r('catBaud').value,10),
+      dataBits: 8,
+      stopBits: framing === '8n2' ? 2 : 1,
+      parity: 'none',
+    });
+    R.port = port;
+    try{ await port.setSignals({dataTerminalReady:false, requestToSend:false}); }
+    catch(err){ console.warn('setSignals not supported/failed on connect', err); }
+    R.catWriter = port.writable.getWriter();
+    R.catReader = port.readable.getReader();
+    $r('btnCat').classList.add('connected');
+    $r('catState').textContent = 'connected · ' + $r('catBaud').value + ' baud';
+    setDot('dotCat','on');
+    updateRadioLinkSummary();
+  }catch(err){
+    console.error(err);
+    alert('CAT connection failed or was cancelled: '+err.message);
+  }
+}
+
+async function catSend(bytes){
+  if(!R.catWriter) return null;
+  await R.catWriter.write(new Uint8Array(bytes));
+}
+
+async function catReadResponse(timeoutMs=800){
+  if(!R.catReader) return null;
+  const chunks = []; let total = 0;
+  const deadline = Date.now() + timeoutMs;
+  while(Date.now() < deadline){
+    const timeout = new Promise(res=>setTimeout(()=>res(null), Math.max(0,deadline-Date.now())));
+    const result = await Promise.race([R.catReader.read(), timeout]);
+    if(!result || result.done) break;
+    chunks.push(result.value); total += result.value.length;
+    if(result.value.includes(0xFD)) break;
+  }
+  if(!chunks.length) return null;
+  const buf = new Uint8Array(total);
+  let off=0; for(const c of chunks){ buf.set(c, off); off += c.length; }
+  return buf;
+}
+
+async function setFrequency(hz){
+  if(!R.catWriter){ alert('Connect CAT first.'); return; }
+  await catSend(civFrame(0x05, [...civFreqBytes(hz)]));
+  R.frequencyHz = hz;
+  updateVfoDisplay();
+}
+
+async function readFrequency(){
+  if(!R.catWriter){ alert('Connect CAT first.'); return; }
+  await catSend(civFrame(0x03, []));
+  const resp = await catReadResponse();
+  if(!resp || resp.length < 11){ $r('vfoMode').textContent = 'MODE — (no reply)'; return; }
+  const fdIdx = resp.indexOf(0xFD);
+  const cmdIdx = resp.indexOf(0x03, 4);
+  if(fdIdx < 0 || cmdIdx < 0 || fdIdx - cmdIdx < 6){ $r('vfoMode').textContent='MODE — (bad frame)'; return; }
+  const fbytes = resp.slice(cmdIdx+1, cmdIdx+6);
+  let hz = 0, mult = 1;
+  for(let i=0;i<5;i++){ const b = fbytes[i]; const lo=(b>>4)&0xF, hi=b&0xF; hz += lo*mult*10 + hi*mult; mult *= 100; }
+  if(hz > 0){ R.frequencyHz = hz; updateVfoDisplay(); }
+  $r('vfoMode').textContent = 'CI-V OK';
+}
+
+function updateVfoDisplay(){
+  const mhz = (R.frequencyHz/1e6).toFixed(6);
+  $r('vfoHz').textContent = mhz;
+  $r('freqSet').value = mhz;
+}
+
+async function catPTT(on){
+  if(!R.catWriter) return;
+  await catSend(civFrame([0x1C,0x00], [on ? 0x01 : 0x00]));
+}
+async function serialLinePTT(on, line){
+  if(!R.port) return;
+  const signals = line === 'dtr' ? {dataTerminalReady: on} : {requestToSend: on};
+  await R.port.setSignals(signals);
+}
+
+$r('btnCat').addEventListener('click', connectCAT);
+$r('btnSetFreq').addEventListener('click', ()=>{
+  const mhz = parseFloat($r('freqSet').value);
+  if(isNaN(mhz)){ alert('Enter a frequency in MHz, e.g. 14.074000'); return; }
+  setFrequency(Math.round(mhz*1e6));
+});
+$r('btnReadFreq').addEventListener('click', readFrequency);
+
+// ---- PTT via WebHID (CM108-style GPIO USB sound-card interfaces) ----
+async function connectHID(){
+  if(!hasHid){ alert('WebHID is not available in this browser.'); return; }
+  try{
+    const devices = await navigator.hid.requestDevice({filters:[]});
+    if(!devices.length) return;
+    R.hid = devices[0];
+    if(!R.hid.opened) await R.hid.open();
+    $r('btnHid').classList.add('connected');
+    $r('hidState').textContent = 'connected · ' + (R.hid.productName || 'HID device');
+    setDot('dotPtt', R.pttMethod==='hid' ? 'on' : 'warn');
+    updateRadioLinkSummary();
+  }catch(err){
+    console.error(err);
+    alert('PTT interface connection failed: '+err.message);
+  }
+}
+async function hidPTT(on){
+  if(!R.hid) return;
+  const bit = parseInt($r('cm108Bit').value,10);
+  const mask = 1 << (bit-1);
+  const report = new Uint8Array([0x00, on ? mask : 0x00, 0x00, 0x00]);
+  try{ await R.hid.sendReport(0x00, report); }
+  catch(err){
+    console.warn('HID report failed, retrying as feature report', err);
+    try{ await R.hid.sendFeatureReport(0x00, report); }catch(e){ console.error(e); }
+  }
+}
+$r('btnHid').addEventListener('click', connectHID);
+
+// ---- audio out: route TX audio to the G90 via a chosen output device ----
+async function connectRadioAudio(){
+  try{
+    if(!ensureAudioCtx()) throw new Error('Web Audio not available in this browser');
+    // getUserMedia is only used to unlock labelled device names for the
+    // output picker below (a browser privacy requirement) — the mic stream
+    // itself is stopped immediately and nothing from it is used or sent.
+    const tempStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    tempStream.getTracks().forEach(t=>t.stop());
+
+    R.outDest = audioCtx.createMediaStreamDestination();
+    if(!R.outEl){
+      R.outEl = document.createElement('audio');
+      R.outEl.autoplay = true;
+      document.body.appendChild(R.outEl);
+    }
+    R.outEl.srcObject = R.outDest.stream;
+    R.radioOutConnected = true;
+    connectAnalyserToRadioOut();
+
+    await refreshAudioOutputs();
+    $r('btnRadioAudio').classList.add('connected');
+    $r('audioOutState').textContent = 'connected';
+    applyOutputSink();
+    updateRadioLinkSummary();
+  }catch(err){
+    console.error(err);
+    alert('Radio audio connection failed: '+err.message);
+  }
+}
+
+let analyserConnectedToRadio = false;
+function connectAnalyserToRadioOut(){
+  if(!analyser || !R.outDest || analyserConnectedToRadio) return;
+  analyser.connect(R.outDest);
+  analyserConnectedToRadio = true;
+}
+
+async function refreshAudioOutputs(){
+  try{
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outs = devices.filter(d=>d.kind==='audiooutput');
+    const outSel = $r('audioOutSelect');
+    outSel.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Output device'}</option>`).join('') || '<option value="">No outputs found</option>';
+    [...outSel.options].forEach(o=>{ if(/de-?19|g90|cm108|usb audio/i.test(o.textContent)) outSel.value = o.value; });
+  }catch(err){ console.warn(err); }
+}
+
+async function applyOutputSink(){
+  if(!R.outEl || !R.outEl.setSinkId){ setDot('dotAudioOut','warn'); return; }
+  const id = $r('audioOutSelect').value;
+  if(!id) return;
+  try{ await R.outEl.setSinkId(id); setDot('dotAudioOut','on'); }
+  catch(err){ console.warn('setSinkId failed', err); setDot('dotAudioOut','warn'); }
+}
+
+$r('btnRadioAudio').addEventListener('click', connectRadioAudio);
+$r('btnRefreshAudioDevices').addEventListener('click', refreshAudioOutputs);
+$r('audioOutSelect').addEventListener('change', applyOutputSink);
+
+// ---- unified PTT engage/disengage (mirrors the SHACK-90 safety pattern) ----
+async function enablePTT(){
+  if(audioCtx && audioCtx.state === 'suspended'){
+    try{ await audioCtx.resume(); }catch(e){ console.warn('audioCtx.resume failed', e); }
+  }
+  try{
+    if(R.pttMethod === 'hid') await hidPTT(true);
+    else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(true, R.pttMethod);
+    else await catPTT(true);
+  }catch(err){ console.error('PTT engage failed', err); }
+  R.pttEngaged = true;
+  $r('vfoRxTx').textContent = 'TX';
+  $r('vfoRxTx').style.color = 'var(--red)';
+  setDot('dotPtt','on');
+  $r('btnPanicRelease').style.display = 'block';
+  clearTimeout(R.pttSafetyTimer);
+  R.pttSafetyTimer = setTimeout(()=>{ console.warn('PTT safety timeout hit — forcing release'); disablePTT(); }, PTT_SAFETY_MS);
+}
+
+async function disablePTT(){
+  clearTimeout(R.pttSafetyTimer);
+  try{
+    if(R.pttMethod === 'hid') await hidPTT(false);
+    else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(false, R.pttMethod);
+    else await catPTT(false);
+  }catch(err){
+    console.error('PTT release failed — retrying once', err);
+    try{
+      if(R.pttMethod === 'hid') await hidPTT(false);
+      else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(false, R.pttMethod);
+      else await catPTT(false);
+    }catch(err2){ console.error('PTT release retry also failed', err2); }
+  }finally{
+    R.pttEngaged = false;
+    $r('vfoRxTx').textContent = 'RX';
+    $r('vfoRxTx').style.color = '';
+    setDot('dotPtt', (R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') ? 'warn' : 'off');
+    $r('btnPanicRelease').style.display = 'none';
+  }
+}
+
+$r('btnPanicRelease').addEventListener('click', async ()=>{
+  stopRequested = true;
+  pauseRequested = false;
+  window.speechSynthesis.cancel();
+  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
+  finishPlayback();
+  await disablePTT();
+  try{ if(R.port) await R.port.setSignals({dataTerminalReady:false, requestToSend:false}); }catch(e){}
+  try{ if(R.hid) await hidPTT(false); }catch(e){}
+  try{ if(R.catWriter) await catPTT(false); }catch(e){}
+});
+
+// Safety net: force PTT off if the tab loses focus/visibility or the pointer
+// is released elsewhere — never leave a real radio keyed unattended.
+window.addEventListener('blur', ()=>{ if(R.pttEngaged) disablePTT(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && R.pttEngaged) disablePTT(); });
+
+// ---- settings wiring ----
+$r('driveSlider').addEventListener('input', e=>{ R.drive = parseFloat(e.target.value)/100; $r('driveVal').textContent = e.target.value+'%'; });
+$r('pttMethod').addEventListener('change', e=>{
+  R.pttMethod = e.target.value;
+  setDot('dotPtt', (R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') ? 'warn' : (R.catWriter ? 'warn' : 'off'));
+  updateRadioLinkSummary();
+});
+$r('cm108Bit').addEventListener('change', e=>{ R.cm108Bit = parseInt(e.target.value,10); });
+
+// ---- "key radio PTT" toggle, gated to custom-clip mode ----
+function updateOnAirToggleState(){
+  const toggle = $r('txToRadioToggle');
+  const canTx = mode === 'custom';
+  toggle.disabled = !canTx;
+  if(!canTx) toggle.checked = false;
+  $r('onAirToggle').classList.toggle('armed', toggle.checked);
+  $r('onAirTag').textContent = toggle.checked ? 'ARMED' : 'OFF';
+  $r('radioModeHint').style.display = (mode === 'custom') ? 'none' : 'block';
+}
+$r('txToRadioToggle').addEventListener('change', updateOnAirToggleState);
+updateOnAirToggleState();
+updateVfoDisplay();
 
 // ---------- spectrogram color palettes ----------
 // (definitions live earlier in the script, right before resizeSpectro, since
@@ -1009,6 +1504,7 @@ function setMode(m){
   }
   updateDigitGapVisibility();
   updatePreview();
+  if(typeof updateOnAirToggleState === 'function') updateOnAirToggleState();
 }
 modeBrowser.addEventListener('click', ()=> setMode('browser'));
 modeCustom.addEventListener('click', ()=> setMode('custom'));
@@ -1192,9 +1688,10 @@ function finishPlayback(){
   statusText.textContent = 'STANDBY';
   pauseBtn.textContent = '‖ hold';
   pauseRequested = false;
+  if(R.pttEngaged) disablePTT();
 }
 
-playBtn.addEventListener('click', ()=>{
+playBtn.addEventListener('click', async ()=>{
   const digits = digitsOnly(numbersEl.value);
   if(!digits){ readout.textContent = 'no digits found in input'; return; }
 
@@ -1204,6 +1701,12 @@ playBtn.addEventListener('click', ()=>{
     if(missing.length){ readout.textContent = 'missing clips for: ' + missing.join(', '); return; }
   }
 
+  const wantsRadio = $r('txToRadioToggle').checked;
+  if(wantsRadio && mode !== 'custom'){
+    readout.textContent = 'radio transmit needs custom audio clips mode — browser voices can\'t be routed to hardware audio out';
+    return;
+  }
+
   window.speechSynthesis.cancel();
   if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
 
@@ -1211,6 +1714,12 @@ playBtn.addEventListener('click', ()=>{
   queueIndex = 0;
   stopRequested = false;
   pauseRequested = false;
+
+  if(wantsRadio){
+    if(!R.radioOutConnected){ readout.textContent = 'connect radio audio out first (radio link panel)'; return; }
+    await enablePTT();
+  }
+
   setUiPlaying(true);
   runQueue();
 });
