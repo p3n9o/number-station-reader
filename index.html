@@ -2,1788 +2,1421 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>NUMBERS — Station Reader</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHACK-90 · G90 Waterfall Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Oswald:wght@400;500;600&display=swap');
+  :root{
+    --bg:#0a0c0a;
+    --panel:#12160f;
+    --panel-2:#171c14;
+    --line:#2a3324;
+    --phosphor:#8fff8a;
+    --phosphor-dim:#3d7a3a;
+    --amber:#ffb454;
+    --amber-dim:#8a6428;
+    --teal:#5bd9c9;
+    --red:#ff6b5e;
+    --text:#d9e6d3;
+    --text-dim:#7b8a73;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    --sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{min-height:100vh;}
+  ::selection{background:var(--phosphor-dim);color:#fff;}
 
-:root{
-  --bg: #0a0c08;
-  --panel: #14170f;
-  --panel-raised: #191d13;
-  --bezel: #2a2e21;
-  --phosphor: #39ff6a;
-  --phosphor-dim: #1f8f3e;
-  --amber: #ffb347;
-  --bone: #c9cbb8;
-  --bone-dim: #6f7364;
-  --red: #e4442e;
-  --mono: 'Space Mono', monospace;
-  --sans: 'Oswald', sans-serif;
-}
+  /* top rail */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#0d0f0b,#0a0c0a);
+    position:sticky;top:0;z-index:20;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;}
+  .brand .mark{
+    font-family:var(--mono);font-weight:700;letter-spacing:.08em;
+    color:var(--phosphor);font-size:15px;
+    text-shadow:0 0 12px rgba(143,255,138,.35);
+  }
+  .brand .sub{font-size:11px;color:var(--text-dim);letter-spacing:.05em;}
+  .status-strip{display:flex;gap:14px;font-family:var(--mono);font-size:11px;flex-wrap:wrap;}
+  .status-chip{display:flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid var(--line);border-radius:3px;background:var(--panel);}
+  .dot{width:7px;height:7px;border-radius:50%;background:#4a4a4a;flex:none;}
+  .dot.on{background:var(--phosphor);box-shadow:0 0 6px var(--phosphor);}
+  .dot.warn{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+  .dot.off{background:var(--red);box-shadow:0 0 6px var(--red);}
 
-*{ box-sizing: border-box; }
+  .browser-warning{
+    background:#2a1512;border-bottom:1px solid #5c2b23;color:#ffb4a8;
+    font-family:var(--mono);font-size:12px;padding:8px 20px;display:none;
+  }
 
-html,body{
-  margin:0;
-  min-height:100%;
-  background: radial-gradient(ellipse at 50% -10%, #1a1e12 0%, var(--bg) 55%);
-  color: var(--bone);
-  font-family: var(--sans);
-  -webkit-font-smoothing: antialiased;
-}
+  /* tabs */
+  .tabs{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--bg);}
+  .tab-btn{
+    font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    background:none;border:none;color:var(--text-dim);padding:11px 16px;cursor:pointer;
+    border-bottom:2px solid transparent;transition:color .15s, border-color .15s;
+  }
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--phosphor);border-bottom-color:var(--phosphor);}
 
-body{ padding: 28px 16px 60px; display:flex; justify-content:center; }
-.set{ width:100%; max-width: 780px; }
+  .view{display:none;padding:18px 20px 60px;max-width:1400px;margin:0 auto;}
+  .view.active{display:block;}
 
-.callsign{
-  display:flex; justify-content:space-between; align-items:baseline;
-  border-bottom: 1px solid var(--bezel); padding-bottom: 10px; margin-bottom: 18px;
-}
-.callsign h1{ font-family: var(--mono); font-weight:700; font-size: 20px; letter-spacing: 0.14em; color: var(--bone); margin:0; }
-.callsign h1 span{ color: var(--amber); }
-.callsign .freq{ font-family: var(--mono); font-size: 12px; color: var(--bone-dim); letter-spacing: 0.08em; }
+  /* layout: radio view */
+  .radio-grid{display:grid;grid-template-columns:300px 1fr;gap:16px;}
+  @media (max-width:900px){.radio-grid{grid-template-columns:1fr;}}
 
-.cabinet{
-  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
-  border: 1px solid var(--bezel); border-radius: 6px; padding: 22px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 30px 60px -25px rgba(0,0,0,0.8);
-}
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:14px 14px 16px;
+  }
+  .panel + .panel{margin-top:14px;}
+  .panel h3{
+    margin:0 0 12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--text-dim);
+    display:flex;align-items:center;gap:8px;
+  }
+  .panel h3::after{content:"";flex:1;height:1px;background:var(--line);}
 
-.meter-wrap{ border: 1px solid var(--bezel); background: #060704; border-radius: 4px; padding: 14px 16px 10px; margin-bottom: 20px; }
-.meter-label{ font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--bone-dim); display:flex; justify-content:space-between; margin-bottom: 8px; }
-.meter-bars{ display:flex; align-items:flex-end; gap: 3px; height: 34px; }
-.meter-bars i{ flex:1; background: var(--phosphor-dim); height: 15%; border-radius: 1px; transition: height 90ms ease, background 90ms ease; }
-.meter-bars.live i{ background: var(--phosphor); }
+  .btn{
+    font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--text);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+    padding:9px 12px;cursor:pointer;width:100%;text-align:left;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .btn:hover{border-color:var(--phosphor-dim);color:var(--phosphor);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.connected{border-color:var(--phosphor);color:var(--phosphor);background:#10190f;}
+  .btn small{color:var(--text-dim);font-size:10px;}
+  .btn-row{display:flex;gap:8px;}
+  .btn-row .btn{width:auto;flex:1;justify-content:center;}
 
-.readout{ font-family: var(--mono); font-size: 13px; color: var(--phosphor); min-height: 18px; margin-top: 8px; letter-spacing: 0.05em; opacity: 0.85; }
-.readout.idle{ color: var(--bone-dim); }
+  .btn-primary{
+    background:linear-gradient(180deg,#1a2a17,#12190f);border-color:var(--phosphor-dim);color:var(--phosphor);
+    font-weight:600;
+  }
+  .btn-primary:hover{border-color:var(--phosphor);box-shadow:0 0 10px rgba(143,255,138,.15);}
 
-.spectro-wrap{ border: 1px solid var(--bezel); background: #060704; border-radius: 4px; padding: 14px 16px 12px; margin-bottom: 20px; }
-.spectro-wrap .meter-label{ margin-bottom: 8px; }
-.spectro-wrap .meter-label .tag{ font-size: 9px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--bezel); color: var(--bone-dim); letter-spacing: 0.1em; }
-.spectro-wrap .meter-label .tag.live{ border-color: var(--phosphor-dim); color: var(--phosphor); }
-.spectro-wrap .meter-label .tag.sim{ border-color: var(--amber); color: var(--amber); }
-#spectroCanvas{ display:block; width:100%; height:90px; border-radius: 2px; background:#060704; }
-.spectro-controls{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 14px; }
-@media (max-width: 520px){ .spectro-controls{ grid-template-columns: 1fr; } }
-.spectro-note{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); margin-top: 6px; letter-spacing: 0.03em; line-height:1.5; }
+  .btn-tune{
+    background:linear-gradient(180deg,#2a1b0f,#1c1109);border:1px solid var(--amber-dim);color:var(--amber);
+    font-weight:600;
+  }
+  .btn-tune:hover{border-color:var(--amber);box-shadow:0 0 10px rgba(255,180,84,.15);}
+  .btn-tune.active{background:var(--red);color:#1a0603;border-color:var(--red);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 6px rgba(255,107,94,.4)}50%{box-shadow:0 0 18px rgba(255,107,94,.85)}}
 
-.theme-picker{ display:flex; flex-wrap:wrap; gap:8px; }
-.theme-picker.spaced{ margin-bottom: 20px; }
-.theme-swatch{
-  flex: 1 1 90px; min-width: 84px; border: 1px solid var(--bezel); border-radius: 4px;
-  padding: 7px; cursor: pointer; text-align: center; background: var(--panel);
-  transition: border-color 120ms ease;
-}
-.theme-swatch:hover{ border-color: var(--bone-dim); }
-.theme-swatch.active{ border-color: var(--phosphor-dim); box-shadow: 0 0 0 1px var(--phosphor-dim) inset; }
-.theme-swatch .preview{ display:flex; height: 16px; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
-.theme-swatch .preview span{ flex: 1; }
-.theme-swatch .label{ font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--bone-dim); }
-.theme-swatch.active .label{ color: var(--bone); }
-.theme-group-label{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
-.theme-group-label .tier{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); letter-spacing: 0.08em; }
+  .vfo{
+    font-family:var(--mono);text-align:right;background:#060706;
+    border:1px solid var(--line);border-radius:4px;padding:12px 14px;margin-bottom:12px;
+  }
+  .vfo .hz{font-size:28px;font-weight:600;color:var(--phosphor);text-shadow:0 0 10px rgba(143,255,138,.3);letter-spacing:.02em;}
+  .vfo .unit{font-size:12px;color:var(--text-dim);margin-left:4px;}
+  .vfo .mode-row{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text-dim);}
+  .freq-input{display:flex;gap:6px;margin-top:10px;}
+  .freq-input input{
+    flex:1;font-family:var(--mono);background:#060706;border:1px solid var(--line);color:var(--text);
+    padding:7px 8px;border-radius:4px;font-size:12px;
+  }
+  .freq-input button{
+    font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px solid var(--line);
+    color:var(--text);border-radius:4px;padding:0 10px;cursor:pointer;
+  }
+  .freq-input button:hover{color:var(--phosphor);border-color:var(--phosphor-dim);}
 
-details.theme-collapse{ margin-bottom: 18px; }
-details.theme-collapse:last-child{ margin-bottom: 0; }
-details.theme-collapse summary{
-  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim);
-  padding: 2px 0; user-select: none;
-}
-details.theme-collapse summary::-webkit-details-marker{ display: none; }
-details.theme-collapse summary .chev{
-  display: inline-block; color: var(--bone-dim); transition: transform 120ms ease; font-size: 10px;
-}
-details.theme-collapse[open] summary .chev{ transform: rotate(90deg); }
-details.theme-collapse summary:hover{ color: var(--bone); }
-details.theme-collapse summary .current{
-  margin-left: auto; color: var(--phosphor); font-size: 10px; letter-spacing: 0.05em; text-transform: none;
-}
-details.theme-collapse .theme-picker{ margin-top: 10px; }
+  .meter{height:6px;background:#060706;border-radius:3px;overflow:hidden;border:1px solid var(--line);margin-top:8px;}
+  .meter .fill{height:100%;width:0%;background:linear-gradient(90deg,var(--phosphor),var(--amber),var(--red));transition:width .05s;}
+  .meter-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;}
 
-label.field-label{ display:block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bone-dim); margin-bottom: 6px; }
+  label.field{display:block;font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:.05em;text-transform:uppercase;margin:12px 0 6px;}
+  label.field:first-child{margin-top:0;}
+  input[type=range]{width:100%;accent-color:var(--phosphor);}
+  .range-val{font-family:var(--mono);font-size:11px;color:var(--phosphor);float:right;}
 
-textarea{
-  width:100%; background: #050603; border: 1px solid var(--bezel); border-radius: 4px;
-  color: var(--phosphor); font-family: var(--mono); font-size: 17px; letter-spacing: 0.12em;
-  padding: 14px; resize: vertical; min-height: 90px; outline:none;
-}
-textarea::placeholder{ color: var(--phosphor-dim); opacity:0.6; }
-textarea:focus{ border-color: var(--phosphor-dim); }
+  select, .textfield{
+    width:100%;font-family:var(--mono);font-size:12px;background:#060706;border:1px solid var(--line);
+    color:var(--text);padding:7px 8px;border-radius:4px;
+  }
 
-.grouped-preview{ font-family: var(--mono); font-size: 13px; color: var(--bone-dim); margin-top: 8px; min-height: 16px; word-break: break-all; }
-.warn{ color: var(--red); }
+  .hint{font-size:11px;color:var(--text-dim);line-height:1.5;margin-top:8px;}
+  .hint.warn{color:var(--amber);}
 
-.mode-switch{ display:flex; gap:8px; margin: 18px 0 4px; }
-.mode-btn{
-  flex:1; padding: 10px 12px; border-radius: 4px; border: 1px solid var(--bezel);
-  background: var(--panel); color: var(--bone-dim); font-family: var(--mono);
-  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor:pointer; text-align:center;
-}
-.mode-btn.active{ border-color: var(--phosphor-dim); color: var(--phosphor); background: rgba(57,255,106,0.06); }
+  /* waterfall */
+  .scope-wrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .scope-head{
+    display:flex;justify-content:space-between;align-items:center;padding:10px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .scope-head h3{margin:0;}
+  .scope-freqs{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:4px 14px;}
+  #waterfall{display:block;width:100%;height:420px;background:#000;image-rendering:pixelated;}
+  .scope-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .scope-foot .btn{width:auto;flex:1;min-width:140px;justify-content:center;}
 
-.clip-panel{ margin-top: 14px; border: 1px solid var(--bezel); border-radius: 4px; padding: 14px; background: #0d0f0a; }
+  .drop-zone{
+    border:1.5px dashed var(--line);border-radius:6px;padding:20px 14px;text-align:center;
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;transition:border-color .15s,color .15s;
+  }
+  .drop-zone:hover, .drop-zone.drag{border-color:var(--phosphor-dim);color:var(--phosphor);}
+  .drop-zone input{display:none;}
+  .preview-row{display:flex;gap:10px;align-items:center;margin-top:10px;}
+  #imgPreview{width:64px;height:64px;object-fit:cover;border:1px solid var(--line);border-radius:4px;display:none;}
+  .preview-info{font-family:var(--mono);font-size:10px;color:var(--text-dim);flex:1;}
 
-/* ---- pack bar ---- */
-.pack-bar{ display:flex; gap:8px; align-items:center; margin-bottom: 14px; flex-wrap: wrap; }
-.pack-bar select{
-  flex: 1; min-width: 140px; background: var(--panel); border: 1px solid var(--bezel); color: var(--phosphor);
-  font-family: var(--mono); font-size: 13px; padding: 8px 10px; border-radius: 3px; outline:none;
-}
-.pack-bar input[type=text]{
-  flex: 1; min-width: 120px; background: #050603; border: 1px solid var(--bezel); color: var(--bone);
-  font-family: var(--mono); font-size: 12px; padding: 8px 10px; border-radius: 3px; outline:none;
-}
-.pack-bar button{ font-size: 11px; padding: 8px 10px; white-space: nowrap; }
-.pack-bar .imp-label{
-  font-family: var(--mono); font-size: 11px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--phosphor-dim);
-  color: var(--phosphor); cursor:pointer; white-space: nowrap;
-}
-.pack-bar .imp-label:hover{ background: rgba(57,255,106,0.08); }
-.pack-bar input[type=file]{ display:none; }
+  .progress-track{height:5px;background:#060706;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:10px;display:none;}
+  .progress-fill{height:100%;width:0%;background:var(--teal);transition:width .15s;}
 
-.import-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); margin: -6px 0 14px; line-height:1.5; }
-.import-hint code{ color: var(--amber); }
+  /* settings grid */
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;}
 
-.clip-grid{ display:grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
-@media (max-width: 560px){ .clip-grid{ grid-template-columns: repeat(3, 1fr); } }
-.clip-slot{
-  border: 1px dashed var(--bezel); border-radius: 4px; padding: 8px 6px; text-align:center;
-  display:flex; flex-direction:column; align-items:center; gap:6px; position:relative;
-}
-.clip-slot.loaded{ border-style: solid; border-color: var(--phosphor-dim); }
-.clip-slot .key{ font-family: var(--mono); font-size: 15px; font-weight:700; color: var(--bone); }
-.clip-slot .status{ font-family: var(--mono); font-size: 9px; color: var(--bone-dim); letter-spacing: 0.05em; }
-.clip-slot.loaded .status{ color: var(--phosphor); }
-.clip-slot .name{ font-size: 8px; color: var(--bone-dim); max-width: 100%; overflow:hidden; text-overflow: ellipsis; white-space:nowrap; }
-.clip-slot input[type=file]{ display:none; }
-.clip-slot .upload-btn, .clip-slot .preview-btn{
-  font-family: var(--mono); font-size: 10px; color: var(--bone); background: var(--panel);
-  border: 1px solid var(--bezel); border-radius: 3px; padding: 3px 6px; cursor:pointer; width:100%;
-}
-.clip-slot .upload-btn:hover, .clip-slot .preview-btn:hover{ border-color: var(--phosphor-dim); }
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
-.clip-actions{ display:flex; justify-content:space-between; align-items:center; margin-top: 12px; }
-.clip-actions button{ font-size: 11px; padding: 7px 10px; }
-.clip-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); }
-
-.controls{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; margin-top: 22px; }
-@media (max-width: 520px){ .controls{ grid-template-columns: 1fr; } }
-.ctrl.disabled{ opacity: 0.35; pointer-events: none; }
-.ctrl select, .ctrl input[type=number]{
-  width:100%; background: var(--panel); border: 1px solid var(--bezel); color: var(--bone);
-  font-family: var(--mono); font-size: 13px; padding: 8px 10px; border-radius: 3px; outline:none;
-}
-.ctrl select:focus, .ctrl input[type=number]:focus{ border-color: var(--phosphor-dim); }
-.ctrl input[type=range]{ width:100%; accent-color: var(--amber); height: 18px; }
-.ctrl .row{ display:flex; justify-content:space-between; align-items:baseline; }
-.ctrl .val{ font-family: var(--mono); font-size: 12px; color: var(--amber); }
-
-.toggle-row{ display:flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; }
-.toggle{ display:flex; align-items:center; gap:8px; font-family: var(--mono); font-size: 12px; color: var(--bone); cursor:pointer; user-select:none; }
-.toggle input{ accent-color: var(--phosphor); width:15px; height:15px; }
-.toggle.disabled{ opacity: 0.35; pointer-events: none; }
-
-.transport{ display:flex; gap: 10px; margin-top: 22px; }
-button{
-  font-family: var(--sans); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-  font-size: 13px; padding: 12px 18px; border-radius: 4px; border: 1px solid var(--bezel);
-  background: var(--panel); color: var(--bone); cursor:pointer; transition: all 120ms ease;
-}
-button:hover{ border-color: var(--bone-dim); }
-button:active{ transform: translateY(1px); }
-button:disabled{ opacity:0.35; cursor:not-allowed; }
-button.primary{ background: var(--phosphor-dim); border-color: var(--phosphor-dim); color: #04180a; flex: 1.3; }
-button.primary:hover{ background: var(--phosphor); border-color: var(--phosphor); }
-button.stop{ border-color: var(--red); color: var(--red); }
-button.stop:hover{ background: rgba(228,68,46,0.1); }
-
-button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible{
-  outline: 2px solid var(--amber); outline-offset: 2px;
-}
-
-footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); letter-spacing: 0.1em; }
-
-@media (prefers-reduced-motion: reduce){ .meter-bars i{ transition: none; } }
-
-/* ---- radio link (G90 CAT / PTT / audio) ---- */
-.status-strip{ display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0 18px; }
-.status-chip{
-  display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid var(--bezel);
-  border-radius:3px; background: var(--panel); font-family: var(--mono); font-size: 10px;
-  letter-spacing: 0.06em; color: var(--bone-dim);
-}
-.dot{ width:7px; height:7px; border-radius:50%; background:#4a4a4a; flex:none; }
-.dot.on{ background: var(--phosphor); box-shadow: 0 0 6px var(--phosphor); }
-.dot.warn{ background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-.dot.off{ background: var(--red); box-shadow: 0 0 6px var(--red); }
-
-.radio-panel{ border: 1px solid var(--bezel); border-radius: 4px; padding: 14px; background: #0d0f0a; margin-top: 10px; }
-.radio-panel + .radio-panel{ margin-top: 12px; }
-.radio-panel h4{
-  margin: 0 0 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--bone-dim); display:flex; align-items:center; gap:8px;
-}
-.radio-panel h4::after{ content:""; flex:1; height:1px; background: var(--bezel); }
-
-.radio-btn{
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; color: var(--bone);
-  background: var(--panel); border: 1px solid var(--bezel); border-radius: 4px;
-  padding: 9px 11px; cursor:pointer; width:100%; text-align:left;
-  display:flex; align-items:center; justify-content:space-between; gap:8px;
-  transition: border-color 120ms ease, color 120ms ease; margin-bottom: 8px;
-}
-.radio-btn:hover{ border-color: var(--phosphor-dim); color: var(--phosphor); }
-.radio-btn:last-child{ margin-bottom:0; }
-.radio-btn small{ color: var(--bone-dim); font-size: 9px; }
-.radio-btn.connected{ border-color: var(--phosphor-dim); color: var(--phosphor); background: rgba(57,255,106,0.06); }
-
-.radio-row{ display:flex; gap:8px; }
-.radio-row > *{ flex:1; }
-
-.vfo-readout{
-  font-family: var(--mono); text-align:right; background:#050603; border:1px solid var(--bezel);
-  border-radius:4px; padding:10px 12px; margin-bottom:10px;
-}
-.vfo-readout .hz{ font-size:22px; font-weight:700; color: var(--phosphor); letter-spacing:0.02em; }
-.vfo-readout .unit{ font-size:11px; color: var(--bone-dim); margin-left:4px; }
-.vfo-readout .mode-row{ display:flex; justify-content:space-between; margin-top:5px; font-size:10px; color: var(--bone-dim); }
-
-.radio-field{ display:block; font-family: var(--mono); font-size: 10px; color: var(--bone-dim); letter-spacing: 0.05em; text-transform: uppercase; margin: 10px 0 6px; }
-.radio-field:first-child{ margin-top:0; }
-.radio-field .val{ color: var(--amber); float:right; text-transform:none; }
-.radio-panel select, .radio-panel input[type=text], .radio-panel input[type=number]{
-  width:100%; font-family: var(--mono); font-size: 12px; background:#050603; border:1px solid var(--bezel);
-  color: var(--bone); padding:7px 8px; border-radius:4px;
-}
-.radio-panel input[type=range]{ width:100%; accent-color: var(--amber); }
-
-.on-air-toggle{
-  display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 10px 12px;
-  border: 1px solid var(--bezel); border-radius:4px; margin: 12px 0; background: var(--panel);
-}
-.on-air-toggle.armed{ border-color: var(--red); background: rgba(228,68,46,0.08); }
-.on-air-toggle label{ font-family: var(--mono); font-size: 11px; letter-spacing:0.06em; color: var(--bone); cursor:pointer; display:flex; align-items:center; gap:9px; }
-.on-air-toggle input{ accent-color: var(--red); width:16px; height:16px; }
-.on-air-toggle .tag{ font-family: var(--mono); font-size:9px; padding:2px 7px; border-radius:8px; border:1px solid var(--bezel); color: var(--bone-dim); letter-spacing:0.08em; }
-.on-air-toggle.armed .tag{ border-color: var(--red); color: var(--red); }
-
-#btnPanicRelease{ display:none; border-color: var(--red); color: var(--red); width:100%; margin-top:8px; }
-#btnPanicRelease:hover{ background: rgba(228,68,46,0.1); }
-
-.radio-hint{ font-family: var(--mono); font-size: 10px; color: var(--bone-dim); line-height:1.6; margin-top:8px; }
-.radio-hint.warn{ color: var(--amber); }
-.radio-warning{ background:#2a1512; border:1px solid #5c2b23; color:#ffb4a8; font-family: var(--mono); font-size:10px; padding:9px 11px; border-radius:4px; margin-bottom:10px; line-height:1.5; display:none; }
+  footer{
+    text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);
+    padding:24px 20px 40px;letter-spacing:.03em;
+  }
 </style>
 </head>
 <body>
-<div class="set">
 
-  <div class="callsign">
-    <h1>NUMBERS<span>·</span>READER</h1>
-    <div class="freq" id="clock">— — : — —</div>
+<div class="topbar">
+  <div class="brand">
+    <span class="mark">SHACK‑90</span>
+    <span class="sub">Xiegu G90 · DE‑19 waterfall console</span>
   </div>
-
   <div class="status-strip">
     <div class="status-chip"><span class="dot" id="dotCat"></span>CAT</div>
-    <div class="status-chip"><span class="dot" id="dotPtt"></span>PTT</div>
-    <div class="status-chip"><span class="dot" id="dotAudioOut"></span>RADIO AUDIO OUT</div>
+    <div class="status-chip"><span class="dot" id="dotHid"></span>PTT (HID)</div>
+    <div class="status-chip"><span class="dot" id="dotAudioIn"></span>AUDIO IN</div>
+    <div class="status-chip"><span class="dot" id="dotAudioOut"></span>AUDIO OUT</div>
   </div>
-  <div class="radio-warning" id="radioBrowserWarning">⚠ This browser doesn't expose Web Serial and/or WebHID. Use a Chromium-based desktop browser (Chrome, Edge, Opera) over HTTPS to connect a real G90. Local browser-voice / clip playback still works without it.</div>
+</div>
 
-  <div class="cabinet">
+<div class="browser-warning" id="browserWarning">
+  ⚠ This browser doesn't expose Web Serial and/or WebHID. Use a Chromium-based desktop browser (Chrome, Edge, Opera) over HTTPS to connect real hardware. The waterfall display and image-to-audio tools still work without it.
+</div>
 
-    <details class="theme-collapse" id="uiThemeDetails">
-      <summary><span class="chev">▸</span><span>interface theme</span><span class="current" id="uiThemeCurrent">Phosphor</span></summary>
-      <div class="theme-picker spaced" id="uiThemePicker"></div>
-    </details>
+<div class="tabs">
+  <button class="tab-btn active" data-tab="radio">Radio</button>
+  <button class="tab-btn" data-tab="settings">Settings</button>
+</div>
 
-    <div class="meter-wrap">
-      <div class="meter-label"><span>SIGNAL</span><span id="statusText">STANDBY</span></div>
-      <div class="meter-bars" id="meterBars"></div>
-      <div class="readout idle" id="readout">awaiting traffic</div>
-    </div>
+<!-- ===================== RADIO VIEW ===================== -->
+<div class="view active" id="view-radio">
+  <div class="radio-grid">
 
-    <div class="spectro-wrap" id="spectroWrap">
-      <div class="meter-label">
-        <span>SPECTROGRAM</span>
-        <span class="tag" id="spectroTag">IDLE</span>
-      </div>
-      <canvas id="spectroCanvas" height="90"></canvas>
-      <div class="spectro-controls">
-        <div class="ctrl">
-          <div class="row"><label class="field-label" for="specGain">gain</label><span class="val" id="specGainVal">1.00×</span></div>
-          <input type="range" id="specGain" min="0.25" max="4" step="0.05" value="1">
-        </div>
-        <div class="ctrl">
-          <div class="row"><label class="field-label" for="specZoom">zoom (scroll speed)</label><span class="val" id="specZoomVal">1.00×</span></div>
-          <input type="range" id="specZoom" min="0.25" max="3" step="0.05" value="1">
-        </div>
-        <div class="ctrl">
-          <div class="row"><label class="field-label" for="specMinFreq">min frequency</label><span class="val" id="specMinFreqVal">0 Hz</span></div>
-          <input type="range" id="specMinFreq" min="0" max="10000" step="50" value="0">
-        </div>
-        <div class="ctrl">
-          <div class="row"><label class="field-label" for="specMaxFreq">max frequency</label><span class="val" id="specMaxFreqVal">8000 Hz</span></div>
-          <input type="range" id="specMaxFreq" min="500" max="20000" step="100" value="8000">
-        </div>
-      </div>
-      <details class="theme-collapse" id="spectroThemeDetails" style="margin-top:14px;">
-        <summary><span class="chev">▸</span><span>spectrogram palette</span><span class="current" id="spectroThemeCurrent">Classic</span></summary>
-        <div class="theme-picker" id="spectroThemePicker"></div>
-      </details>
-      <div class="spectro-note" id="spectroNote">live analysis of playing audio · scrolls left to right, low freq at bottom</div>
-    </div>
-
-    <details class="theme-collapse" id="radioLinkDetails">
-      <summary><span class="chev">▸</span><span>radio link — G90 CAT / PTT / audio</span><span class="current" id="radioLinkCurrent">not connected</span></summary>
-
-      <div class="radio-panel">
-        <h4>Connections</h4>
-        <button class="radio-btn" id="btnCat">Connect CAT (Web Serial)<small id="catState">not connected</small></button>
-        <button class="radio-btn" id="btnHid">Connect PTT interface (WebHID)<small id="hidState">not connected</small></button>
-        <button class="radio-btn" id="btnRadioAudio">Connect radio audio out<small id="audioOutState">not connected</small></button>
-        <div class="radio-hint">Only one application can hold the CAT port or audio device at a time — close WSJT-X / SDR Console / OmniRig before connecting here, or bridge through <code>rigctld</code>. RTS/DTR are forced low the instant CAT connects so opening the port can't itself key the transmitter.</div>
+    <!-- left rack -->
+    <div class="rack">
+      <div class="panel">
+        <h3>Connections</h3>
+        <button class="btn" id="btnCat">Connect CAT (Web Serial)<small id="catState">not connected</small></button>
+        <div style="height:8px"></div>
+        <button class="btn" id="btnHid">Connect PTT interface (WebHID)<small id="hidState">not connected</small></button>
+        <div style="height:8px"></div>
+        <button class="btn" id="btnAudio">Connect DE‑19 audio<small id="audioState">not connected</small></button>
+        <div class="hint">Only one application can hold the CAT port or audio device at a time. Close WSJT‑X / SDR Console / OmniRig before connecting here, or bridge through <code>rigctld</code>.</div>
       </div>
 
-      <div class="radio-panel">
-        <h4>VFO</h4>
-        <div class="vfo-readout">
+      <div class="panel">
+        <h3>VFO</h3>
+        <div class="vfo">
           <div><span class="hz" id="vfoHz">— — . — — — . — —</span><span class="unit">MHz</span></div>
           <div class="mode-row"><span id="vfoMode">MODE —</span><span id="vfoRxTx">RX</span></div>
         </div>
-        <div class="radio-row">
+        <div class="freq-input">
           <input type="text" id="freqSet" placeholder="e.g. 14.074000">
-          <button id="btnSetFreq" style="flex:0 0 auto;">SET</button>
+          <button id="btnSetFreq">SET</button>
         </div>
-        <button class="radio-btn" id="btnReadFreq" style="justify-content:center;margin-top:8px;">↻ Read frequency from rig</button>
+        <div class="freq-input">
+          <button id="btnReadFreq" style="flex:1;">↻ Read frequency from rig</button>
+        </div>
       </div>
 
-      <div class="on-air-toggle" id="onAirToggle">
-        <label><input type="checkbox" id="txToRadioToggle"><span>Key radio PTT &amp; transmit audio to G90</span></label>
-        <span class="tag" id="onAirTag">OFF</span>
-      </div>
-      <div class="radio-hint warn" id="radioModeHint">Browser voices can't be captured by the page's audio engine, so they can only be sent over the air in <b>custom audio clips</b> mode — switch modes above to key the rig for real transmission. With this off, playback stays local (monitor only).</div>
-      <button class="radio-btn" id="btnPanicRelease">⏹ Force PTT release</button>
-
-      <div class="radio-panel">
-        <h4>Drive &amp; PTT method</h4>
-        <label class="radio-field">Mic / drive gain fed to radio <span class="val" id="driveVal">20%</span></label>
+      <div class="panel">
+        <h3>PTT &amp; Drive</h3>
+        <button class="btn btn-primary" id="btnPtt">PTT — hold to transmit</button>
+        <button class="btn" id="btnPanicRelease" style="display:none;margin-top:8px;border-color:var(--red);color:var(--red);justify-content:center;">⏹ Force PTT release</button>
+        <label class="field">Mic / drive gain fed to radio <span class="range-val" id="driveVal">20%</span></label>
         <input type="range" id="driveSlider" min="0" max="100" value="20">
-        <div class="radio-hint warn">If received audio sounds crunchy, "robotic", or splattery, this is almost always drive set too hot — turn it <i>down</i>, not up, and watch the G90's ALC indicator: it should barely move on voice clips. Start low (10–20%) and bring it up only until the audio is clean and readable.</div>
-        <label class="radio-field">PTT method</label>
-        <select id="pttMethod">
-          <option value="cat" selected>CI-V command (1C 00 — rig TX on/off)</option>
-          <option value="rts">Serial RTS line (hardware PTT)</option>
-          <option value="dtr">Serial DTR line (hardware PTT)</option>
-          <option value="hid">WebHID GPIO (experimental, unconfirmed on DE-19)</option>
-        </select>
-        <label class="radio-field">HID GPIO bit for PTT (if using WebHID)</label>
-        <select id="cm108Bit">
-          <option value="1">GPIO 1 (0x01)</option>
-          <option value="2" selected>GPIO 2 (0x02)</option>
-          <option value="3">GPIO 3 (0x04)</option>
-          <option value="4">GPIO 4 (0x08)</option>
-        </select>
-        <div class="radio-hint">The G90 speaks Icom CI-V (behaves as an IC-7100/IC-756PRO clone) — default rig address <b>70</b>, controller <b>E0</b>, 19200 baud. If CI-V PTT doesn't key the rig, try the RTS/DTR options instead.</div>
+        <div class="meter"><div class="fill" id="txMeter"></div></div>
+        <div class="meter-label"><span>TX audio level</span><span id="txMeterPct">0%</span></div>
+        <div class="hint warn">A picture with many simultaneous "on" tones (dense letter strokes, filled shapes) reads much louder to the rig than a normal voice or FT8 signal. If a receiving station sees a solid, textured block instead of your picture, that's ALC-driven splatter — turn drive <i>down</i>, not up, and watch the G90's ALC indicator: it should barely move.</div>
+        <div class="hint">Drive sets the level of audio sent to the radio's mic/data input. If CI-V PTT ever misbehaves, the G90's menu also supports VOX keying from the Line In audio as a fallback.</div>
+        <div class="hint">The per-column power in the image encoder is normalized so a busy region and a sparse region hit the radio with roughly the same average level, but overall drive still needs to sit low enough that ALC action stays at or near zero.</div>
       </div>
+    </div>
 
-      <div class="radio-panel">
-        <h4>CAT settings</h4>
-        <div class="radio-row">
-          <div>
-            <label class="radio-field">Baud rate</label>
-            <select id="catBaud">
-              <option value="4800">4800</option>
-              <option value="9600">9600</option>
-              <option value="19200" selected>19200 (G90 default)</option>
-              <option value="38400">38400</option>
-            </select>
-          </div>
-          <div>
-            <label class="radio-field">Framing</label>
-            <select id="catFraming">
-              <option value="8n1" selected>8N1</option>
-              <option value="8n2">8N2</option>
-            </select>
+    <!-- right: waterfall -->
+    <div>
+      <div class="scope-wrap">
+        <div class="scope-head">
+          <h3 style="margin:0;">Waterfall — receive<span id="scopeTxBadge" style="display:none;color:var(--red);font-family:var(--mono);font-size:10px;letter-spacing:.08em;margin-left:10px;">● TRANSMITTING</span></h3>
+          <div class="btn-row" style="width:auto;">
+            <button class="btn" id="btnStartWaterfall" style="width:auto;">▶ Start</button>
           </div>
         </div>
-        <div class="radio-row">
-          <div>
-            <label class="radio-field">CI-V rig address</label>
-            <input type="text" id="civTo" value="70">
-          </div>
-          <div>
-            <label class="radio-field">CI-V controller address</label>
-            <input type="text" id="civFrom" value="E0">
-          </div>
+        <canvas id="waterfall"></canvas>
+        <div class="scope-freqs"><span id="wfMinLabel">300 Hz</span><span id="wfCenterLabel"></span><span id="wfMaxLabel">2700 Hz</span></div>
+      </div>
+
+      <div class="panel" style="margin-top:14px;">
+        <h3>Image → waterfall transmit</h3>
+        <div class="drop-zone" id="dropZone">
+          Click or drop a photo — it will be rendered into the waterfall as it transmits.
+          <input type="file" id="fileInput" accept="image/*">
         </div>
-        <div class="radio-hint warn">Xiegu's own CAT guide notes that leaving a polling CAT program connected and then power-cycling the G90 can be misread as the firmware-update key combo — disconnect CAT when you're done.</div>
+        <div class="freq-input" style="margin-top:10px;">
+          <input type="text" id="textInput" placeholder="…or type text to send as waterfall text instead">
+          <button id="btnRenderText">Use text</button>
+        </div>
+        <div class="preview-row">
+          <img id="imgPreview">
+          <div class="preview-info" id="imgInfo">No image loaded.</div>
+        </div>
+        <label class="field">Transmit speed <span class="range-val" id="txSpeedVal">Normal — 0.09s/column</span></label>
+        <input type="range" id="txSpeedSlider" min="0.03" max="0.3" step="0.01" value="0.09">
+        <div class="progress-track" id="txProgressTrack"><div class="progress-fill" id="txProgressFill"></div></div>
+        <div class="scope-foot">
+          <button class="btn btn-primary" id="btnRenderImage" disabled>1 · Render to audio</button>
+          <button class="btn btn-primary" id="btnPreviewImage" disabled>▶ Preview (speaker)</button>
+          <button class="btn btn-tune" id="btnTxImage" disabled>2 · Transmit over air</button>
+        </div>
+        <div class="hint">Image is converted to grayscale, then rendered as a proper inverse-spectrogram (overlap-add sine synthesis) — one row of pixels per frequency bin, one column per time slice — so it redraws as a picture in a receiving station's waterfall. Slower transmit speed = more time per column = sharper detail but a longer time on air. Fine-tune resolution in <b>Settings → Image encode</b>.</div>
       </div>
 
-      <div class="radio-panel">
-        <h4>Audio output device</h4>
-        <label class="radio-field">Output (to G90 / DE-19 mic-data input)</label>
-        <select id="audioOutSelect"><option value="">Connect radio audio first…</option></select>
-        <button class="radio-btn" id="btnRefreshAudioDevices" style="margin-top:8px;justify-content:center;">↻ Refresh device list</button>
-        <div class="radio-hint">Uses <code>setSinkId</code>, supported in Chromium browsers. Pick your G90 audio interface explicitly on multi-soundcard machines. Getting a labelled device list requires briefly granting microphone permission — no audio is captured or sent anywhere from that mic.</div>
-      </div>
-
-      <div class="radio-hint">Check your amateur licence conditions and band plan before keying up. This page runs entirely client-side — nothing leaves your browser except what the radio itself transmits.</div>
-    </details>
-
-    <label class="field-label" for="numbers">paste numbers</label>
-    <textarea id="numbers" placeholder="e.g. 40928 17364 55210" spellcheck="false"></textarea>
-    <div class="grouped-preview" id="preview"></div>
-
-    <div class="mode-switch">
-      <div class="mode-btn active" id="modeBrowser" data-mode="browser">browser voices</div>
-      <div class="mode-btn" id="modeCustom" data-mode="custom">custom audio clips</div>
-    </div>
-
-    <div class="clip-panel" id="clipPanel" style="display:none;">
-
-      <div class="pack-bar">
-        <select id="packSelect"></select>
-        <input type="text" id="newPackName" placeholder="new pack name">
-        <button id="addPackBtn">+ new pack</button>
-        <button id="deletePackBtn">delete pack</button>
-      </div>
-
-      <div class="pack-bar">
-        <label class="imp-label" for="bulkImport">⇪ import files to this pack</label>
-        <input type="file" id="bulkImport" multiple accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.weba,.webm">
-        <button id="clearClips">clear this pack</button>
-      </div>
-      <div class="import-hint">
-        bulk import matches filenames to slots automatically — name files like
-        <code>0.wav</code> … <code>9.wav</code>, <code>attention.mp3</code>, <code>end.ogg</code>
-        (case-insensitive, any extension — mp3, wav, ogg, m4a, flac, etc. all work, matching ignores it). unmatched files are skipped.
-      </div>
-
-      <div class="clip-grid" id="clipGrid"></div>
-      <div class="clip-actions">
-        <span class="clip-hint" id="clipHint">upload a short clip for each digit you plan to use</span>
+      <div class="panel" style="margin-top:14px;">
+        <h3>Test tuning</h3>
+        <button class="btn btn-tune" id="btnTune">Transmit constant carrier (tune)</button>
+        <div class="hint warn">Keys PTT and sends an unmodulated tone at the carrier frequency set in Settings. Auto-cuts off after the configured safety timeout. Use only briefly, at low power, for antenna/amp tuning — check your licence conditions before transmitting.</div>
       </div>
     </div>
+  </div>
+</div>
 
-    <div class="controls">
-      <div class="ctrl" id="voiceCtrl">
-        <label class="field-label" for="voiceSelect">voice</label>
-        <select id="voiceSelect"></select>
+<!-- ===================== SETTINGS VIEW ===================== -->
+<div class="view" id="view-settings">
+  <div class="settings-grid">
+
+    <div class="panel">
+      <h3>Waterfall display</h3>
+      <label class="field">Gain <span class="range-val" id="wfGainVal">1.0×</span></label>
+      <input type="range" id="wfGain" min="0.1" max="4" step="0.1" value="1.0">
+
+      <div class="two-col">
+        <div>
+          <label class="field">Min frequency (Hz)</label>
+          <input class="textfield" type="number" id="wfMin" value="300" step="50">
+        </div>
+        <div>
+          <label class="field">Max frequency (Hz)</label>
+          <input class="textfield" type="number" id="wfMax" value="2700" step="50">
+        </div>
       </div>
 
-      <div class="ctrl">
-        <label class="field-label" for="groupSize">group size</label>
-        <input type="number" id="groupSize" min="1" max="20" value="5">
-      </div>
+      <label class="field">Scroll speed <span class="range-val" id="wfSpeedVal">Normal</span></label>
+      <input type="range" id="wfSpeed" min="1" max="5" step="1" value="3">
 
-      <div class="ctrl">
-        <div class="row"><label class="field-label" for="rate">rate</label><span class="val" id="rateVal">0.85</span></div>
-        <input type="range" id="rate" min="0.4" max="1.6" step="0.05" value="0.85">
-      </div>
+      <label class="field">FFT size</label>
+      <select id="wfFft">
+        <option value="1024">1024 (fast, coarse)</option>
+        <option value="2048" selected>2048 (balanced)</option>
+        <option value="4096">4096</option>
+        <option value="8192">8192 (fine, slower)</option>
+      </select>
 
-      <div class="ctrl" id="pitchCtrl">
-        <div class="row"><label class="field-label" for="pitch">pitch <span style="opacity:.6">(voices only)</span></label><span class="val" id="pitchVal">1.0</span></div>
-        <input type="range" id="pitch" min="0" max="2" step="0.05" value="1">
-      </div>
-
-      <div class="ctrl">
-        <div class="row"><label class="field-label" for="volume">volume</label><span class="val" id="volumeVal">1.0</span></div>
-        <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
-      </div>
-
-      <div class="ctrl" id="digitGapCtrl" style="display:none;">
-        <div class="row"><label class="field-label" for="digitGap">gap between digits</label><span class="val" id="digitGapVal">150ms</span></div>
-        <input type="range" id="digitGap" min="0" max="1000" step="25" value="150">
-      </div>
-
-      <div class="ctrl">
-        <div class="row"><label class="field-label" for="pause">pause between groups</label><span class="val" id="pauseVal">600ms</span></div>
-        <input type="range" id="pause" min="0" max="2000" step="50" value="600">
-      </div>
-
-      <div class="ctrl">
-        <div class="row"><label class="field-label" for="repeats">repeat message</label><span class="val" id="repeatsVal">1×</span></div>
-        <input type="range" id="repeats" min="1" max="5" step="1" value="1">
-      </div>
+      <label class="field">Colour palette</label>
+      <select id="wfPalette">
+        <option value="phosphor" selected>Phosphor green</option>
+        <option value="amber">Amber</option>
+        <option value="ice">Ice blue</option>
+        <option value="classic">Classic (blue→red)</option>
+      </select>
     </div>
 
-    <div class="toggle-row">
-      <label class="toggle" id="digitModeToggle"><input type="checkbox" id="digitMode" checked> read digits individually</label>
-      <label class="toggle"><input type="checkbox" id="preamble" checked> intro / outro phrases</label>
+    <div class="panel">
+      <h3>CAT control</h3>
+      <label class="field">Baud rate</label>
+      <select id="catBaud">
+        <option value="4800">4800</option>
+        <option value="9600">9600</option>
+        <option value="19200" selected>19200 (G90 default)</option>
+        <option value="38400">38400</option>
+      </select>
+      <label class="field">Data / parity / stop bits</label>
+      <select id="catFraming">
+        <option value="8n1" selected>8N1</option>
+        <option value="8n2">8N2</option>
+      </select>
+      <div class="two-col">
+        <div>
+          <label class="field">CI-V rig address</label>
+          <input class="textfield" type="text" id="civTo" value="70">
+        </div>
+        <div>
+          <label class="field">CI-V controller address</label>
+          <input class="textfield" type="text" id="civFrom" value="E0">
+        </div>
+      </div>
+      <label class="field">PTT method</label>
+      <select id="pttMethod">
+        <option value="cat" selected>CI-V command (1C 00 — rig TX on/off)</option>
+        <option value="rts">Serial RTS line (hardware PTT)</option>
+        <option value="dtr">Serial DTR line (hardware PTT)</option>
+        <option value="hid">WebHID GPIO (experimental, unconfirmed on DE‑19)</option>
+      </select>
+      <label class="field">HID GPIO bit for PTT (if using WebHID)</label>
+      <select id="cm108Bit">
+        <option value="1">GPIO 1 (0x01)</option>
+        <option value="2" selected>GPIO 2 (0x02)</option>
+        <option value="3">GPIO 3 (0x04)</option>
+        <option value="4">GPIO 4 (0x08)</option>
+      </select>
+      <div class="hint">The G90 speaks Icom CI-V (it CATs as an IC‑7100/IC‑756PRO clone), hex addresses shown without the "0x" — default rig address <b>70</b>, controller <b>E0</b>, 19200 baud. The DE‑19's 4‑pin "PA" port is a TX/BAND/ALC keying <i>output</i> for an amplifier, not a computer‑to‑radio PTT input. If CI‑V PTT doesn't key the rig, your interface may instead expect a hardware RTS or DTR toggle — try those options above. RTS/DTR are always forced low the instant CAT connects, specifically so opening the port itself can't accidentally key the transmitter.</div>
+      <div class="hint warn">Xiegu's own CAT guide notes that leaving a polling CAT program connected and then power-cycling the G90 can be misread as the firmware‑update key combo — disconnect CAT software when you're done.</div>
     </div>
 
-    <div class="transport">
-      <button class="primary" id="playBtn">▶ transmit</button>
-      <button id="pauseBtn" disabled>‖ hold</button>
-      <button class="stop" id="stopBtn" disabled>■ end</button>
+    <div class="panel">
+      <h3>Audio devices</h3>
+      <label class="field">Input (DE‑19 receive audio)</label>
+      <select id="audioInSelect"><option value="">Connect audio first…</option></select>
+      <label class="field">Output (DE‑19 mic/data input)</label>
+      <select id="audioOutSelect"><option value="">Connect audio first…</option></select>
+      <button class="btn" id="btnRefreshDevices" style="margin-top:10px;">↻ Refresh device list</button>
+      <div class="hint">Output device selection uses <code>setSinkId</code>, supported in Chromium browsers. Pick the DE‑19 explicitly on multi-soundcard machines.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Image encode</h3>
+      <div class="two-col">
+        <div>
+          <label class="field">Time columns</label>
+          <input class="textfield" type="number" id="imgCols" value="140" min="20" max="400">
+        </div>
+        <div>
+          <label class="field">Frequency rows</label>
+          <input class="textfield" type="number" id="imgRows" value="64" min="16" max="200">
+        </div>
+      </div>
+      <div class="hint">
+        <b>Time columns</b> — how many time-steps the image is divided into along its playback duration. Higher = smoother horizontal (time-axis) detail but a longer transmission.<br>
+        <b>Frequency rows</b> — how many distinct tones make up the audio passband width. Higher = finer left-right picture detail, but each tone gets a narrower slice of the Min/Max frequency range above, so very high values can sound muddier on a narrow passband.
+      </div>
+      <label class="field">Seconds per column <span class="range-val" id="imgFrameVal">0.09 s</span></label>
+      <input type="range" id="imgFrame" min="0.03" max="0.3" step="0.01" value="0.09">
+      <label class="field">Brightness curve (gamma) <span class="range-val" id="imgGammaVal">1.0</span></label>
+      <input type="range" id="imgGamma" min="0.4" max="2.5" step="0.1" value="1.0">
+      <label class="field" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+        <span>Invert (dark subject on light background)</span>
+        <input type="checkbox" id="imgInvert" style="width:auto;accent-color:var(--phosphor);">
+      </label>
+      <label class="field" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+        <span>Flip horizontal (mirror left↔right)</span>
+        <input type="checkbox" id="imgFlipH" style="width:auto;accent-color:var(--phosphor);">
+      </label>
+      <label class="field" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+        <span>Flip vertical (mirror top↔bottom)</span>
+        <input type="checkbox" id="imgFlipV" style="width:auto;accent-color:var(--phosphor);">
+      </label>
+      <div class="hint">Flips apply to the rendered transmission only (the thumbnail preview above stays as-loaded), so you can compare orientation against how a receiving station's waterfall actually draws it.</div>
+      <div class="hint">Bright pixels are transmitted as "on" tones — correct for light text/shapes on a dark photo. Most ordinary photos (dark ink on paper, a printed page) are the opposite, so this is auto-ticked when an uploaded photo's average brightness looks light-background; override it if the result looks backwards.</div>
+      <div class="hint" id="imgDurationHint">Estimated transmit time: ~12.6 s</div>
+    </div>
+
+    <div class="panel">
+      <h3>Test tuning</h3>
+      <label class="field">Carrier tone frequency (Hz) <span class="range-val" id="tuneFreqVal">1500 Hz</span></label>
+      <input type="range" id="tuneFreq" min="300" max="2700" step="10" value="1500">
+      <label class="field">Safety cutoff (seconds) <span class="range-val" id="tuneTimeoutVal">30 s</span></label>
+      <input type="range" id="tuneTimeout" min="5" max="120" step="5" value="30">
     </div>
 
   </div>
-
-  <footer>VOICE MODE USES YOUR BROWSER'S BUILT-IN VOICES · CLIP MODE PLAYS FILES YOU IMPORT · NOTHING LEAVES YOUR BROWSER · PACKS RESET ON RELOAD</footer>
 </div>
 
+<footer>SHACK‑90 runs entirely client-side · Web Serial / WebHID / Web Audio · no data leaves this page · check your amateur licence conditions before transmitting</footer>
+
 <script>
-const numbersEl = document.getElementById('numbers');
-const previewEl = document.getElementById('preview');
-const voiceSelect = document.getElementById('voiceSelect');
-const voiceCtrl = document.getElementById('voiceCtrl');
-const pitchCtrl = document.getElementById('pitchCtrl');
-const digitGapCtrl = document.getElementById('digitGapCtrl');
-const digitModeToggle = document.getElementById('digitModeToggle');
-const groupSizeEl = document.getElementById('groupSize');
-const rateEl = document.getElementById('rate');
-const pitchEl = document.getElementById('pitch');
-const volumeEl = document.getElementById('volume');
-const pauseEl = document.getElementById('pause');
-const digitGapEl = document.getElementById('digitGap');
-const specGainEl = document.getElementById('specGain');
-const specZoomEl = document.getElementById('specZoom');
-const specMinFreqEl = document.getElementById('specMinFreq');
-const specMaxFreqEl = document.getElementById('specMaxFreq');
-const specGainVal = document.getElementById('specGainVal');
-const specZoomVal = document.getElementById('specZoomVal');
-const specMinFreqVal = document.getElementById('specMinFreqVal');
-const specMaxFreqVal = document.getElementById('specMaxFreqVal');
-const repeatsEl = document.getElementById('repeats');
-const digitModeEl = document.getElementById('digitMode');
-const preambleEl = document.getElementById('preamble');
-const playBtn = document.getElementById('playBtn');
-const pauseBtn = document.getElementById('pauseBtn');
-const stopBtn = document.getElementById('stopBtn');
-const readout = document.getElementById('readout');
-const statusText = document.getElementById('statusText');
-const meterBars = document.getElementById('meterBars');
-const clockEl = document.getElementById('clock');
-const modeBrowser = document.getElementById('modeBrowser');
-const modeCustom = document.getElementById('modeCustom');
-const clipPanel = document.getElementById('clipPanel');
-const clipGrid = document.getElementById('clipGrid');
-const clipHint = document.getElementById('clipHint');
-const clearClipsBtn = document.getElementById('clearClips');
-const packSelect = document.getElementById('packSelect');
-const newPackName = document.getElementById('newPackName');
-const addPackBtn = document.getElementById('addPackBtn');
-const deletePackBtn = document.getElementById('deletePackBtn');
-const bulkImport = document.getElementById('bulkImport');
+(() => {
+  'use strict';
 
-const rateVal = document.getElementById('rateVal');
-const pitchVal = document.getElementById('pitchVal');
-const volumeVal = document.getElementById('volumeVal');
-const pauseVal = document.getElementById('pauseVal');
-const digitGapVal = document.getElementById('digitGapVal');
-const repeatsVal = document.getElementById('repeatsVal');
+  // ---------- state ----------
+  const S = {
+    port:null, catWriter:null, catReader:null, catFraming:'8n1',
+    hid:null, cm108Bit:2,
+    audioCtx:null, analyser:null, micSource:null, micStream:null,
+    outEl:null, outDest:null, // for routed output via setSinkId
+    waterfall:{ gain:1.0, min:300, max:2700, speed:3, fft:2048, palette:'phosphor', running:false },
+    drive:0.2,
+    pttMethod:'cat',
+    tuning:false, tuneTimer:null, tuneOsc:null, tuneGain:null,
+    renderedBuffer:null,
+    frequencyHz:14074000,
+  };
 
-const digitWords = ['zero','one','two','three','four','five','six','seven','eight','nine'];
-let mode = 'browser'; // 'browser' | 'custom'
+  const $ = id => document.getElementById(id);
 
-// ---------- interface theme presets ----------
-// "contrast" ones use saturated, high-value accents against a near-black panel for
-// max legibility. "pastel" ones desaturate and lighten everything for a softer,
-// washed-out look — still functional, just quieter on the eyes.
-const uiThemes = {
-  phosphor: { label:'Phosphor', tier:'contrast', vars:{
-    '--bg':'#0a0c08','--panel':'#14170f','--panel-raised':'#191d13','--bezel':'#2a2e21',
-    '--phosphor':'#39ff6a','--phosphor-dim':'#1f8f3e','--amber':'#ffb347','--bone':'#c9cbb8','--bone-dim':'#6f7364','--red':'#e4442e'
-  }},
-  amberTerm: { label:'Amber Term', tier:'contrast', vars:{
-    '--bg':'#0c0a06','--panel':'#17130d','--panel-raised':'#1d1810','--bezel':'#332b1c',
-    '--phosphor':'#ffb454','--phosphor-dim':'#b9772a','--amber':'#ffd27a','--bone':'#e8d9bd','--bone-dim':'#8a7a5e','--red':'#ff5a3c'
-  }},
-  bloodSignal: { label:'Blood Signal', tier:'contrast', vars:{
-    '--bg':'#0c0505','--panel':'#170a0a','--panel-raised':'#1e0d0d','--bezel':'#3a1414',
-    '--phosphor':'#ff4d4d','--phosphor-dim':'#a12626','--amber':'#ff9f4d','--bone':'#e8c7c7','--bone-dim':'#8a6060','--red':'#ff2020'
-  }},
-  iceCyan: { label:'Ice Cyan', tier:'contrast', vars:{
-    '--bg':'#050a0c','--panel':'#0d161a','--panel-raised':'#111e22','--bezel':'#1f3a40',
-    '--phosphor':'#5be3ff','--phosphor-dim':'#2b8fa8','--amber':'#a0f0ff','--bone':'#cfe9ee','--bone-dim':'#69898f','--red':'#ff5d7a'
-  }},
-  dustyRose: { label:'Dusty Rose', tier:'pastel', vars:{
-    '--bg':'#211a1d','--panel':'#2c2225','--panel-raised':'#33272b','--bezel':'#493a3e',
-    '--phosphor':'#d99fae','--phosphor-dim':'#a4707e','--amber':'#e0b48c','--bone':'#e6d3d6','--bone-dim':'#9c8489','--red':'#c97b7b'
-  }},
-  sageFog: { label:'Sage Fog', tier:'pastel', vars:{
-    '--bg':'#1b1e1a','--panel':'#232823','--panel-raised':'#2a302a','--bezel':'#3d443c',
-    '--phosphor':'#a8c1a3','--phosphor-dim':'#7c9478','--amber':'#c9b98a','--bone':'#d8ded4','--bone-dim':'#8d968a','--red':'#c78f7f'
-  }},
-  slateBlue: { label:'Slate Blue', tier:'pastel', vars:{
-    '--bg':'#191c22','--panel':'#20242c','--panel-raised':'#262b34','--bezel':'#3a4150',
-    '--phosphor':'#9fb4d9','--phosphor-dim':'#71839f','--amber':'#c2a8d9','--bone':'#d6dce6','--bone-dim':'#838ea0','--red':'#c98da8'
-  }},
-  driftwood: { label:'Driftwood', tier:'pastel', vars:{
-    '--bg':'#1e1c18','--panel':'#28251f','--panel-raised':'#2f2b24','--bezel':'#463f34',
-    '--phosphor':'#cbb98f','--phosphor-dim':'#998a68','--amber':'#d9c9a3','--bone':'#e2d8c4','--bone-dim':'#948a76','--red':'#c99575'
-  }}
-};
-let activeUiTheme = 'phosphor';
+  // ---------- capability check ----------
+  const hasSerial = 'serial' in navigator;
+  const hasHid = 'hid' in navigator;
+  if(!hasSerial || !hasHid){
+    $('browserWarning').style.display = 'block';
+  }
 
-function applyUiTheme(key){
-  const theme = uiThemes[key];
-  if(!theme) return;
-  Object.entries(theme.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
-  activeUiTheme = key;
-  document.getElementById('uiThemeCurrent').textContent = theme.label;
-  document.querySelectorAll('#uiThemePicker .theme-swatch').forEach(el=>{
-    el.classList.toggle('active', el.dataset.key === key);
-  });
-}
-
-function renderUiThemePicker(){
-  const container = document.getElementById('uiThemePicker');
-  container.innerHTML = '';
-  Object.entries(uiThemes).forEach(([key, theme])=>{
-    const swatch = document.createElement('div');
-    swatch.className = 'theme-swatch' + (key === activeUiTheme ? ' active' : '');
-    swatch.dataset.key = key;
-    const colors = [theme.vars['--bg'], theme.vars['--phosphor'], theme.vars['--amber'], theme.vars['--red']];
-    swatch.innerHTML = `
-      <div class="preview">${colors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
-      <div class="label">${theme.label}</div>
-    `;
-    swatch.addEventListener('click', ()=> applyUiTheme(key));
-    container.appendChild(swatch);
-  });
-}
-renderUiThemePicker();
-
-const slotDefs = [
-  {key:'0',label:'0'},{key:'1',label:'1'},{key:'2',label:'2'},{key:'3',label:'3'},
-  {key:'4',label:'4'},{key:'5',label:'5'},{key:'6',label:'6'},{key:'7',label:'7'},
-  {key:'8',label:'8'},{key:'9',label:'9'},{key:'attention',label:'ATTN'},{key:'end',label:'END'}
-];
-const slotKeySet = new Set(slotDefs.map(d=>d.key));
-
-// ---------- pack storage: packs[name] = { key: {url, name} } ----------
-const packs = { 'Default': {} };
-let activePack = 'Default';
-
-function refreshPackSelect(){
-  packSelect.innerHTML = '';
-  Object.keys(packs).forEach(name=>{
-    const o = document.createElement('option');
-    o.value = name; o.textContent = name;
-    if(name === activePack) o.selected = true;
-    packSelect.appendChild(o);
-  });
-}
-refreshPackSelect();
-
-// ---------- built-in packs from voices/manifest.json (for GitHub Pages hosting) ----------
-async function loadManifest(){
-  try{
-    const res = await fetch('voices/manifest.json', { cache: 'no-store' });
-    if(!res.ok) return;
-    const data = await res.json();
-    const manifestNames = Object.keys(data);
-
-    manifestNames.forEach(packName=>{
-      if(!packs[packName]) packs[packName] = {};
-      Object.entries(data[packName]).forEach(([key, path])=>{
-        if(slotKeySet.has(key)){
-          packs[packName][key] = { url: path, name: path.split('/').pop(), builtIn: true };
-        }
-      });
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      btn.classList.add('active');
+      $('view-'+btn.dataset.tab).classList.add('active');
     });
-
-    // if nothing has been manually loaded into Default, jump straight to the first bundled pack
-    if(manifestNames.length && Object.keys(packs['Default']).length === 0){
-      switchPack(manifestNames[0]);
-    } else {
-      refreshPackSelect();
-    }
-  } catch(e){
-    // no manifest.json present (or fetch blocked, e.g. opening the file directly) — app still works fine manually
-  }
-}
-loadManifest();
-
-// ---------- meter ----------
-const BAR_COUNT = 28;
-for(let i=0;i<BAR_COUNT;i++){ meterBars.appendChild(document.createElement('i')); }
-function setMeter(active, level){
-  meterBars.classList.toggle('live', active);
-  const bars = meterBars.children;
-  for(let i=0;i<bars.length;i++){
-    bars[i].style.height = active ? (15 + Math.random()*level*85)+'%' : '15%';
-  }
-}
-let meterInterval = null;
-function startMeter(){ stopMeter(); meterInterval = setInterval(()=> setMeter(true, 0.9), 90); }
-function stopMeter(){ if(meterInterval){ clearInterval(meterInterval); meterInterval = null; } setMeter(false, 0); }
-
-// ---------- spectrogram ----------
-// Real-mode: uploaded/custom audio clips are actual decodable audio, so we tap them
-// with a Web Audio AnalyserNode and draw a true frequency-over-time waterfall.
-// Sim-mode: the browser's built-in speech synthesis voices do NOT expose their audio
-// signal to any web API (no MediaStream, no buffer access) in any browser today, so a
-// literal FFT of TTS output isn't possible from a page. Instead we draw a stylised
-// formant-shaped waterfall driven by real speech timing (start/pause/end/boundary
-// events), so the display still tracks what's actually being spoken, just not from
-// real sample data. The SIM/LIVE tag makes it clear which one is on screen.
-const spectroCanvas = document.getElementById('spectroCanvas');
-const sctx = spectroCanvas.getContext('2d', { alpha: false });
-const spectroTag = document.getElementById('spectroTag');
-const spectroNote = document.getElementById('spectroNote');
-
-// ---------- spectrogram color palettes ----------
-// Each palette is a set of colour stops (t: 0-1 signal intensity -> rgb) that
-// colorForBin() interpolates between. "contrast" palettes push toward pure,
-// saturated hues for max legibility; "pastel" ones stay muted/light throughout.
-const spectroThemes = {
-  classic: { label:'Classic', tier:'contrast', stops:[
-    {t:0, rgb:[6,7,4]}, {t:0.55, rgb:[35,220,88]}, {t:0.85, rgb:[245,190,18]}, {t:1, rgb:[245,60,18]}
-  ]},
-  ice: { label:'Ice', tier:'contrast', stops:[
-    {t:0, rgb:[4,6,10]}, {t:0.5, rgb:[20,120,220]}, {t:0.8, rgb:[120,220,255]}, {t:1, rgb:[255,255,255]}
-  ]},
-  thermal: { label:'Thermal', tier:'contrast', stops:[
-    {t:0, rgb:[8,4,10]}, {t:0.4, rgb:[110,20,120]}, {t:0.7, rgb:[230,90,20]}, {t:1, rgb:[255,230,60]}
-  ]},
-  mono: { label:'Mono Alert', tier:'contrast', stops:[
-    {t:0, rgb:[4,4,4]}, {t:0.6, rgb:[130,20,20]}, {t:0.85, rgb:[220,30,30]}, {t:1, rgb:[255,120,90]}
-  ]},
-  dustyPastel: { label:'Dusty Pastel', tier:'pastel', stops:[
-    {t:0, rgb:[36,28,32]}, {t:0.5, rgb:[190,140,150]}, {t:0.8, rgb:[220,180,195]}, {t:1, rgb:[240,220,205]}
-  ]},
-  foggyGrey: { label:'Foggy Grey', tier:'pastel', stops:[
-    {t:0, rgb:[22,24,28]}, {t:0.5, rgb:[115,130,145]}, {t:0.8, rgb:[168,183,193]}, {t:1, rgb:[218,226,230]}
-  ]},
-  sepiaFade: { label:'Sepia Fade', tier:'pastel', stops:[
-    {t:0, rgb:[26,21,16]}, {t:0.5, rgb:[165,135,95]}, {t:0.8, rgb:[205,180,145]}, {t:1, rgb:[232,217,192]}
-  ]}
-};
-let activeSpectroTheme = 'classic';
-
-function spectroBgRgb(){
-  return spectroThemes[activeSpectroTheme].stops[0].rgb;
-}
-function spectroBgColorStr(){
-  const [r,g,b] = spectroBgRgb();
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function colorForBin(v){ // v: 0-255
-  const t = Math.min(1, v / 255);
-  const stops = spectroThemes[activeSpectroTheme].stops;
-  let i = 0;
-  while(i < stops.length - 2 && t > stops[i+1].t) i++;
-  const a = stops[i], b = stops[i+1];
-  const span = (b.t - a.t) || 1;
-  const k = (t - a.t) / span;
-  const r = Math.round(a.rgb[0] + (b.rgb[0]-a.rgb[0]) * k);
-  const g = Math.round(a.rgb[1] + (b.rgb[1]-a.rgb[1]) * k);
-  const bch = Math.round(a.rgb[2] + (b.rgb[2]-a.rgb[2]) * k);
-  return `rgb(${r}, ${g}, ${bch})`;
-}
-
-function applySpectroTheme(key){
-  if(!spectroThemes[key]) return;
-  activeSpectroTheme = key;
-  spectroCanvas.style.background = spectroBgColorStr();
-  document.getElementById('spectroThemeCurrent').textContent = spectroThemes[key].label;
-  document.querySelectorAll('#spectroThemePicker .theme-swatch').forEach(el=>{
-    el.classList.toggle('active', el.dataset.key === key);
   });
-}
 
-function renderSpectroThemePicker(){
-  const container = document.getElementById('spectroThemePicker');
-  container.innerHTML = '';
-  Object.entries(spectroThemes).forEach(([key, theme])=>{
-    const swatch = document.createElement('div');
-    swatch.className = 'theme-swatch' + (key === activeSpectroTheme ? ' active' : '');
-    swatch.dataset.key = key;
-    const stops = theme.stops;
-    const previewColors = [stops[0], stops[Math.floor(stops.length/2)], stops[stops.length-1]]
-      .map(s => `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})`);
-    swatch.innerHTML = `
-      <div class="preview">${previewColors.map(c=>`<span style="background:${c}"></span>`).join('')}</div>
-      <div class="label">${theme.label}</div>
-    `;
-    swatch.addEventListener('click', ()=> applySpectroTheme(key));
-    container.appendChild(swatch);
-  });
-}
-renderSpectroThemePicker();
-
-function resizeSpectro(){
-  const rect = spectroCanvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  spectroCanvas.width = Math.max(1, Math.round(rect.width * dpr));
-  spectroCanvas.height = Math.max(1, Math.round(90 * dpr));
-  sctx.fillStyle = spectroBgColorStr();
-  sctx.fillRect(0, 0, spectroCanvas.width, spectroCanvas.height);
-}
-window.addEventListener('resize', resizeSpectro);
-resizeSpectro();
-
-let audioCtx = null, analyser = null, analyserData = null;
-function ensureAudioCtx(){
-  if(!audioCtx){
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) return false;
-    audioCtx = new Ctx();
+  function setDot(id, state){ // state: 'off'|'warn'|'on'
+    const d = $(id);
+    d.classList.remove('on','warn','off');
+    if(state) d.classList.add(state);
   }
-  if(!analyser){
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.7;
-    analyserData = new Uint8Array(analyser.frequencyBinCount);
-  }
-  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
-  return true;
-}
 
-const analysedElements = new WeakSet();
-let analyserConnectedToSpeaker = false;
-function connectAnalyserSource(audioEl){
-  if(mode !== 'custom') return;
-  if(!ensureAudioCtx()) return;
-  if(analysedElements.has(audioEl)) return;
-  try{
-    const src = audioCtx.createMediaElementSource(audioEl);
-    src.connect(analyser);
-    if(!analyserConnectedToSpeaker){
-      analyser.connect(audioCtx.destination);
-      analyserConnectedToSpeaker = true;
+  // =====================================================================
+  // CAT CONTROL (Web Serial) — Icom CI-V, which the G90 speaks (behaves as
+  // an IC-7100/IC-756PRO clone). Default address 0x70, 19200 baud, framed
+  // as FE FE <to> <from> <cmd> [data...] FD.
+  // =====================================================================
+  function civFreqBytes(hz){
+    // Icom CI-V frequency encoding: 5 bytes, LSB-first, BCD nibble-swapped per byte.
+    let f = Math.round(hz);
+    const out = new Uint8Array(5);
+    for(let i=0;i<5;i++){
+      out[i] = ((f % 10) << 4) | (Math.floor(f/10) % 10);
+      f = Math.floor(f/100);
     }
-    // If a G90 audio output has been connected, the exact same signal that
-    // feeds the local monitor speaker/spectrogram is also routed to the
-    // radio's mic/data input — this is what actually goes out over the air.
-    connectAnalyserToRadioOut();
-    analysedElements.add(audioEl);
-  } catch(e){
-    // some browsers restrict this for cross-origin sources; the clip will still
-    // play normally through the audio element itself, just without a live trace
+    return out;
   }
-}
-
-// =====================================================================
-// RADIO LINK — G90 CAT (Web Serial / Icom CI-V) + PTT (CAT/RTS/DTR/WebHID)
-// + audio-out routing (Web Audio -> setSinkId), ported from the SHACK-90
-// waterfall console so numbers-group audio can be keyed straight out to a
-// real Xiegu G90 instead of (or alongside) the local monitor speaker.
-// =====================================================================
-const R = {
-  port:null, catWriter:null, catReader:null,
-  hid:null, cm108Bit:2,
-  outEl:null, outDest:null, radioOutConnected:false,
-  drive:0.2,
-  pttMethod:'cat',
-  frequencyHz:14074000,
-  pttEngaged:false, pttSafetyTimer:null,
-};
-const PTT_SAFETY_MS = 120000; // hard auto-release after 2 min no matter what
-
-const $r = id => document.getElementById(id);
-const hasSerial = 'serial' in navigator;
-const hasHid = 'hid' in navigator;
-if(!hasSerial || !hasHid){ $r('radioBrowserWarning').style.display = 'block'; }
-
-function setDot(id, state){ // 'off' | 'warn' | 'on'
-  const d = $r(id);
-  if(!d) return;
-  d.classList.remove('on','warn','off');
-  if(state) d.classList.add(state);
-}
-
-function updateRadioLinkSummary(){
-  const bits = [];
-  if(R.catWriter) bits.push('CAT');
-  if(R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') bits.push('PTT');
-  if(R.radioOutConnected) bits.push('AUDIO');
-  $r('radioLinkCurrent').textContent = bits.length ? bits.join(' · ')+' linked' : 'not connected';
-}
-
-// ---- CAT control (Icom CI-V) ----
-function civFreqBytes(hz){
-  let f = Math.round(hz);
-  const out = new Uint8Array(5);
-  for(let i=0;i<5;i++){ out[i] = ((f % 10) << 4) | (Math.floor(f/10) % 10); f = Math.floor(f/100); }
-  return out;
-}
-function civFrame(cmd, data){
-  const to = parseInt($r('civTo').value, 16) || 0x70;
-  const from = parseInt($r('civFrom').value, 16) || 0xE0;
-  return [0xFE,0xFE, to, from, ...(Array.isArray(cmd)?cmd:[cmd]), ...(data||[]), 0xFD];
-}
-
-async function connectCAT(){
-  if(!hasSerial){ alert('Web Serial is not available in this browser.'); return; }
-  try{
-    const port = await navigator.serial.requestPort();
-    const framing = $r('catFraming').value;
-    await port.open({
-      baudRate: parseInt($r('catBaud').value,10),
-      dataBits: 8,
-      stopBits: framing === '8n2' ? 2 : 1,
-      parity: 'none',
-    });
-    R.port = port;
-    try{ await port.setSignals({dataTerminalReady:false, requestToSend:false}); }
-    catch(err){ console.warn('setSignals not supported/failed on connect', err); }
-    R.catWriter = port.writable.getWriter();
-    R.catReader = port.readable.getReader();
-    $r('btnCat').classList.add('connected');
-    $r('catState').textContent = 'connected · ' + $r('catBaud').value + ' baud';
-    setDot('dotCat','on');
-    updateRadioLinkSummary();
-  }catch(err){
-    console.error(err);
-    alert('CAT connection failed or was cancelled: '+err.message);
+  function civFrame(cmd, data){
+    const to = parseInt($('civTo').value, 16) || 0x70;
+    const from = parseInt($('civFrom').value, 16) || 0xE0;
+    const body = [0xFE,0xFE, to, from, ...(Array.isArray(cmd)?cmd:[cmd]), ...(data||[]), 0xFD];
+    return body;
   }
-}
 
-async function catSend(bytes){
-  if(!R.catWriter) return null;
-  await R.catWriter.write(new Uint8Array(bytes));
-}
-
-async function catReadResponse(timeoutMs=800){
-  if(!R.catReader) return null;
-  const chunks = []; let total = 0;
-  const deadline = Date.now() + timeoutMs;
-  while(Date.now() < deadline){
-    const timeout = new Promise(res=>setTimeout(()=>res(null), Math.max(0,deadline-Date.now())));
-    const result = await Promise.race([R.catReader.read(), timeout]);
-    if(!result || result.done) break;
-    chunks.push(result.value); total += result.value.length;
-    if(result.value.includes(0xFD)) break;
-  }
-  if(!chunks.length) return null;
-  const buf = new Uint8Array(total);
-  let off=0; for(const c of chunks){ buf.set(c, off); off += c.length; }
-  return buf;
-}
-
-async function setFrequency(hz){
-  if(!R.catWriter){ alert('Connect CAT first.'); return; }
-  await catSend(civFrame(0x05, [...civFreqBytes(hz)]));
-  R.frequencyHz = hz;
-  updateVfoDisplay();
-}
-
-async function readFrequency(){
-  if(!R.catWriter){ alert('Connect CAT first.'); return; }
-  await catSend(civFrame(0x03, []));
-  const resp = await catReadResponse();
-  if(!resp || resp.length < 11){ $r('vfoMode').textContent = 'MODE — (no reply)'; return; }
-  const fdIdx = resp.indexOf(0xFD);
-  const cmdIdx = resp.indexOf(0x03, 4);
-  if(fdIdx < 0 || cmdIdx < 0 || fdIdx - cmdIdx < 6){ $r('vfoMode').textContent='MODE — (bad frame)'; return; }
-  const fbytes = resp.slice(cmdIdx+1, cmdIdx+6);
-  let hz = 0, mult = 1;
-  for(let i=0;i<5;i++){ const b = fbytes[i]; const lo=(b>>4)&0xF, hi=b&0xF; hz += lo*mult*10 + hi*mult; mult *= 100; }
-  if(hz > 0){ R.frequencyHz = hz; updateVfoDisplay(); }
-  $r('vfoMode').textContent = 'CI-V OK';
-}
-
-function updateVfoDisplay(){
-  const mhz = (R.frequencyHz/1e6).toFixed(6);
-  $r('vfoHz').textContent = mhz;
-  $r('freqSet').value = mhz;
-}
-
-async function catPTT(on){
-  if(!R.catWriter) return;
-  await catSend(civFrame([0x1C,0x00], [on ? 0x01 : 0x00]));
-}
-async function serialLinePTT(on, line){
-  if(!R.port) return;
-  const signals = line === 'dtr' ? {dataTerminalReady: on} : {requestToSend: on};
-  await R.port.setSignals(signals);
-}
-
-$r('btnCat').addEventListener('click', connectCAT);
-$r('btnSetFreq').addEventListener('click', ()=>{
-  const mhz = parseFloat($r('freqSet').value);
-  if(isNaN(mhz)){ alert('Enter a frequency in MHz, e.g. 14.074000'); return; }
-  setFrequency(Math.round(mhz*1e6));
-});
-$r('btnReadFreq').addEventListener('click', readFrequency);
-
-// ---- PTT via WebHID (CM108-style GPIO USB sound-card interfaces) ----
-async function connectHID(){
-  if(!hasHid){ alert('WebHID is not available in this browser.'); return; }
-  try{
-    const devices = await navigator.hid.requestDevice({filters:[]});
-    if(!devices.length) return;
-    R.hid = devices[0];
-    if(!R.hid.opened) await R.hid.open();
-    $r('btnHid').classList.add('connected');
-    $r('hidState').textContent = 'connected · ' + (R.hid.productName || 'HID device');
-    setDot('dotPtt', R.pttMethod==='hid' ? 'on' : 'warn');
-    updateRadioLinkSummary();
-  }catch(err){
-    console.error(err);
-    alert('PTT interface connection failed: '+err.message);
-  }
-}
-async function hidPTT(on){
-  if(!R.hid) return;
-  const bit = parseInt($r('cm108Bit').value,10);
-  const mask = 1 << (bit-1);
-  const report = new Uint8Array([0x00, on ? mask : 0x00, 0x00, 0x00]);
-  try{ await R.hid.sendReport(0x00, report); }
-  catch(err){
-    console.warn('HID report failed, retrying as feature report', err);
-    try{ await R.hid.sendFeatureReport(0x00, report); }catch(e){ console.error(e); }
-  }
-}
-$r('btnHid').addEventListener('click', connectHID);
-
-// ---- audio out: route TX audio to the G90 via a chosen output device ----
-async function connectRadioAudio(){
-  try{
-    if(!ensureAudioCtx()) throw new Error('Web Audio not available in this browser');
-    // getUserMedia is only used to unlock labelled device names for the
-    // output picker below (a browser privacy requirement) — the mic stream
-    // itself is stopped immediately and nothing from it is used or sent.
-    const tempStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    tempStream.getTracks().forEach(t=>t.stop());
-
-    R.outDest = audioCtx.createMediaStreamDestination();
-    if(!R.outEl){
-      R.outEl = document.createElement('audio');
-      R.outEl.autoplay = true;
-      document.body.appendChild(R.outEl);
-    }
-    R.outEl.srcObject = R.outDest.stream;
-    R.radioOutConnected = true;
-    connectAnalyserToRadioOut();
-
-    await refreshAudioOutputs();
-    $r('btnRadioAudio').classList.add('connected');
-    $r('audioOutState').textContent = 'connected';
-    applyOutputSink();
-    updateRadioLinkSummary();
-  }catch(err){
-    console.error(err);
-    alert('Radio audio connection failed: '+err.message);
-  }
-}
-
-let analyserConnectedToRadio = false;
-function connectAnalyserToRadioOut(){
-  if(!analyser || !R.outDest || analyserConnectedToRadio) return;
-  // Route through a dedicated gain stage so the "drive" slider actually
-  // controls what hits the radio's mic/data input, independently of the
-  // local monitor volume. Feeding the radio unscaled full-level audio is
-  // what drives the rig's ALC into compression/clipping — the "robotic"
-  // distortion is that, not an inherent property of the signal.
-  R.radioGain = audioCtx.createGain();
-  R.radioGain.gain.value = R.drive;
-  analyser.connect(R.radioGain);
-  R.radioGain.connect(R.outDest);
-  analyserConnectedToRadio = true;
-}
-
-async function refreshAudioOutputs(){
-  try{
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const outs = devices.filter(d=>d.kind==='audiooutput');
-    const outSel = $r('audioOutSelect');
-    outSel.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Output device'}</option>`).join('') || '<option value="">No outputs found</option>';
-    [...outSel.options].forEach(o=>{ if(/de-?19|g90|cm108|usb audio/i.test(o.textContent)) outSel.value = o.value; });
-  }catch(err){ console.warn(err); }
-}
-
-async function applyOutputSink(){
-  if(!R.outEl || !R.outEl.setSinkId){ setDot('dotAudioOut','warn'); return; }
-  const id = $r('audioOutSelect').value;
-  if(!id) return;
-  try{ await R.outEl.setSinkId(id); setDot('dotAudioOut','on'); }
-  catch(err){ console.warn('setSinkId failed', err); setDot('dotAudioOut','warn'); }
-}
-
-$r('btnRadioAudio').addEventListener('click', connectRadioAudio);
-$r('btnRefreshAudioDevices').addEventListener('click', refreshAudioOutputs);
-$r('audioOutSelect').addEventListener('change', applyOutputSink);
-
-// ---- unified PTT engage/disengage (mirrors the SHACK-90 safety pattern) ----
-async function enablePTT(){
-  if(audioCtx && audioCtx.state === 'suspended'){
-    try{ await audioCtx.resume(); }catch(e){ console.warn('audioCtx.resume failed', e); }
-  }
-  try{
-    if(R.pttMethod === 'hid') await hidPTT(true);
-    else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(true, R.pttMethod);
-    else await catPTT(true);
-  }catch(err){ console.error('PTT engage failed', err); }
-  R.pttEngaged = true;
-  $r('vfoRxTx').textContent = 'TX';
-  $r('vfoRxTx').style.color = 'var(--red)';
-  setDot('dotPtt','on');
-  $r('btnPanicRelease').style.display = 'block';
-  armPttWatchdog();
-}
-
-// The watchdog is a dead-man's switch, not a cap on total transmission time:
-// as long as the queue is actively advancing (a new item starts, audio
-// keeps playing), petPttWatchdog() below keeps pushing the deadline out. It
-// only actually fires — forcing PTT off — if nothing has happened for
-// PTT_SAFETY_MS, e.g. playback genuinely hung. So a long numbers message
-// with many groups is not artificially cut off at 2 minutes.
-function armPttWatchdog(){
-  clearTimeout(R.pttSafetyTimer);
-  R.pttSafetyTimer = setTimeout(()=>{
-    console.warn('PTT watchdog hit — no activity, forcing release');
-    disablePTT();
-    if(isPlayingFlag) readout.textContent = 'PTT auto-released — no transmit activity for 2 min (stuck audio?)';
-  }, PTT_SAFETY_MS);
-}
-function petPttWatchdog(){
-  if(R.pttEngaged) armPttWatchdog();
-}
-
-async function disablePTT(){
-  clearTimeout(R.pttSafetyTimer);
-  try{
-    if(R.pttMethod === 'hid') await hidPTT(false);
-    else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(false, R.pttMethod);
-    else await catPTT(false);
-  }catch(err){
-    console.error('PTT release failed — retrying once', err);
+  async function connectCAT(){
+    if(!hasSerial){ alert('Web Serial is not available in this browser.'); return; }
     try{
-      if(R.pttMethod === 'hid') await hidPTT(false);
-      else if(R.pttMethod === 'rts' || R.pttMethod === 'dtr') await serialLinePTT(false, R.pttMethod);
-      else await catPTT(false);
-    }catch(err2){ console.error('PTT release retry also failed', err2); }
-  }finally{
-    R.pttEngaged = false;
-    $r('vfoRxTx').textContent = 'RX';
-    $r('vfoRxTx').style.color = '';
-    setDot('dotPtt', (R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') ? 'warn' : 'off');
-    $r('btnPanicRelease').style.display = 'none';
-  }
-}
-
-$r('btnPanicRelease').addEventListener('click', async ()=>{
-  stopRequested = true;
-  pauseRequested = false;
-  window.speechSynthesis.cancel();
-  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
-  finishPlayback();
-  await disablePTT();
-  try{ if(R.port) await R.port.setSignals({dataTerminalReady:false, requestToSend:false}); }catch(e){}
-  try{ if(R.hid) await hidPTT(false); }catch(e){}
-  try{ if(R.catWriter) await catPTT(false); }catch(e){}
-});
-
-// Safety net: force PTT off if the tab loses focus/visibility or the pointer
-// is released elsewhere — never leave a real radio keyed unattended.
-window.addEventListener('blur', ()=>{ if(R.pttEngaged) disablePTT(); });
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden && R.pttEngaged) disablePTT(); });
-
-// ---- settings wiring ----
-$r('driveSlider').addEventListener('input', e=>{
-  R.drive = parseFloat(e.target.value)/100;
-  $r('driveVal').textContent = e.target.value+'%';
-  if(R.radioGain) R.radioGain.gain.value = R.drive;
-});
-$r('pttMethod').addEventListener('change', e=>{
-  R.pttMethod = e.target.value;
-  setDot('dotPtt', (R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') ? 'warn' : (R.catWriter ? 'warn' : 'off'));
-  updateRadioLinkSummary();
-});
-$r('cm108Bit').addEventListener('change', e=>{ R.cm108Bit = parseInt(e.target.value,10); });
-
-// ---- "key radio PTT" toggle, gated to custom-clip mode ----
-function updateOnAirToggleState(){
-  const toggle = $r('txToRadioToggle');
-  const canTx = mode === 'custom';
-  toggle.disabled = !canTx;
-  if(!canTx) toggle.checked = false;
-  $r('onAirToggle').classList.toggle('armed', toggle.checked);
-  $r('onAirTag').textContent = toggle.checked ? 'ARMED' : 'OFF';
-  $r('radioModeHint').style.display = (mode === 'custom') ? 'none' : 'block';
-}
-$r('txToRadioToggle').addEventListener('change', updateOnAirToggleState);
-updateOnAirToggleState();
-updateVfoDisplay();
-
-// ---------- spectrogram color palettes ----------
-// (definitions live earlier in the script, right before resizeSpectro, since
-// resizeSpectro needs spectroBgColorStr() on its very first call)
-
-function drawSpectroColumn(dataArray){
-  const w = spectroCanvas.width, h = spectroCanvas.height;
-  const zoom = parseFloat(specZoomEl.value) || 1;
-  const shift = Math.max(1, Math.round((w / 350) * zoom));
-  sctx.drawImage(spectroCanvas, shift, 0, w - shift, h, 0, 0, w - shift, h);
-  sctx.fillStyle = spectroBgColorStr();
-  sctx.fillRect(w - shift, 0, shift, h);
-  const bins = dataArray.length;
-  const cellH = h / bins;
-  for(let i = 0; i < bins; i++){
-    const v = dataArray[i];
-    if(v < 4) continue;
-    sctx.fillStyle = colorForBin(v);
-    const y = h - (i + 1) * cellH;
-    sctx.fillRect(w - shift, Math.floor(y), shift, Math.ceil(cellH + 1));
-  }
-}
-
-// Applies the gain slider and slices the frequency bins down to the min/max
-// frequency window the person has selected, so the displayed band effectively
-// "zooms" vertically into the range they care about.
-function applyGainAndRange(dataArray, nominalMaxFreq){
-  const gain = parseFloat(specGainEl.value) || 1;
-  const minFreq = parseInt(specMinFreqEl.value) || 0;
-  const maxFreq = parseInt(specMaxFreqEl.value) || nominalMaxFreq;
-  const binCount = dataArray.length;
-  let binStart = Math.floor((minFreq / nominalMaxFreq) * binCount);
-  let binEnd = Math.ceil((maxFreq / nominalMaxFreq) * binCount);
-  binStart = Math.max(0, Math.min(binCount - 1, binStart));
-  binEnd = Math.max(binStart + 1, Math.min(binCount, binEnd));
-  const out = new Uint8Array(binEnd - binStart);
-  for(let i = 0; i < out.length; i++){
-    out[i] = Math.max(0, Math.min(255, dataArray[binStart + i] * gain));
-  }
-  return out;
-}
-
-let spectroRAF = null;
-function spectroFrameReal(){
-  if(analyser){
-    analyser.getByteFrequencyData(analyserData);
-    const nominalMaxFreq = audioCtx ? audioCtx.sampleRate / 2 : 22050;
-    drawSpectroColumn(applyGainAndRange(analyserData, nominalMaxFreq));
-  }
-  spectroRAF = requestAnimationFrame(spectroFrameReal);
-}
-
-let simPhase = 0;
-const SIM_BINS = 56;
-const SIM_NOMINAL_MAX_FREQ = 8000; // the simulated formant shape is drawn across a nominal 0-8kHz band
-function spectroFrameSim(){
-  simPhase += 0.14;
-  const speaking = window.speechSynthesis.speaking && !window.speechSynthesis.pending;
-  const arr = new Uint8Array(SIM_BINS);
-  if(speaking && !pauseRequested){
-    for(let i = 0; i < SIM_BINS; i++){
-      const formant1 = Math.exp(-Math.pow((i - 6) / 4.5, 2)) * 170;
-      const formant2 = Math.exp(-Math.pow((i - 16) / 7, 2)) * 110;
-      const formant3 = Math.exp(-Math.pow((i - 30) / 10, 2)) * 55;
-      const flutter = (Math.sin(simPhase * 3 + i * 0.4) + 1) / 2 * 45;
-      const noise = Math.random() * 35;
-      arr[i] = Math.max(0, Math.min(255, formant1 + formant2 + formant3 + flutter + noise - (i * 0.6)));
-    }
-  }
-  drawSpectroColumn(applyGainAndRange(arr, SIM_NOMINAL_MAX_FREQ));
-  spectroRAF = requestAnimationFrame(spectroFrameSim);
-}
-
-function startSpectro(){
-  cancelAnimationFrame(spectroRAF);
-  if(mode === 'custom'){
-    ensureAudioCtx();
-    spectroTag.textContent = 'LIVE';
-    spectroTag.className = 'tag live';
-    spectroNote.textContent = 'live analysis of the actual playing clip · low frequencies at bottom';
-    spectroFrameReal();
-  } else {
-    spectroTag.textContent = 'SIM';
-    spectroTag.className = 'tag sim';
-    spectroNote.textContent = 'stylised trace synced to speech timing · browser voices don\'t expose real audio data to the page';
-    spectroFrameSim();
-  }
-}
-function stopSpectro(){
-  if(spectroRAF){ cancelAnimationFrame(spectroRAF); spectroRAF = null; }
-  spectroTag.textContent = 'IDLE';
-  spectroTag.className = 'tag';
-}
-
-// ---------- clock ----------
-function tickClock(){
-  const d = new Date();
-  clockEl.textContent = String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC';
-}
-tickClock();
-setInterval(tickClock, 1000*15);
-
-// ---------- voices ----------
-let voices = [];
-function loadVoices(){
-  voices = window.speechSynthesis.getVoices();
-  voiceSelect.innerHTML = '';
-  if(voices.length === 0){
-    const o = document.createElement('option');
-    o.textContent = 'no voices found';
-    voiceSelect.appendChild(o);
-    return;
-  }
-  voices.forEach((v, i)=>{
-    const o = document.createElement('option');
-    o.value = i;
-    o.textContent = v.name + ' (' + v.lang + ')' + (v.default ? ' — default' : '');
-    voiceSelect.appendChild(o);
-  });
-  const enIdx = voices.findIndex(v => v.lang && v.lang.startsWith('en'));
-  if(enIdx >= 0) voiceSelect.value = enIdx;
-}
-loadVoices();
-if('onvoiceschanged' in window.speechSynthesis){ window.speechSynthesis.onvoiceschanged = loadVoices; }
-
-// ---------- clip slot grid (renders whichever pack is active) ----------
-slotDefs.forEach(def=>{
-  const slot = document.createElement('div');
-  slot.className = 'clip-slot';
-  slot.id = 'slot-'+def.key;
-  slot.innerHTML = `
-    <div class="key">${def.label}</div>
-    <div class="status" id="status-${def.key}">empty</div>
-    <div class="name" id="name-${def.key}"></div>
-    <label class="upload-btn" for="file-${def.key}">upload</label>
-    <input type="file" id="file-${def.key}" accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.m4a,.aac,.flac,.weba,.webm">
-    <button class="preview-btn" id="preview-${def.key}" style="display:none;">▶ test</button>
-  `;
-  clipGrid.appendChild(slot);
-
-  const fileInput = slot.querySelector('#file-'+def.key);
-  const previewBtn = slot.querySelector('#preview-'+def.key);
-
-  fileInput.addEventListener('change', (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    assignClip(activePack, def.key, file);
-    e.target.value = '';
-  });
-
-  previewBtn.addEventListener('click', ()=>{
-    const entry = packs[activePack][def.key];
-    if(!entry) return;
-    const a = new Audio(entry.url);
-    a.volume = parseFloat(volumeEl.value);
-    a.onerror = ()=>{
-      clipHint.textContent = describeMediaError(a, entry.name);
-      clipHint.classList.add('warn');
-    };
-    a.play().catch((playErr)=>{
-      clipHint.textContent = a.error ? describeMediaError(a, entry.name) : ('"' + entry.name + '" was blocked from playing: ' + playErr.message);
-      clipHint.classList.add('warn');
-    });
-  });
-});
-
-const probeAudio = document.createElement('audio');
-// HTMLMediaElement failures get lumped into one generic "error" event, but the
-// error object actually tells you what really happened — missing/404 file,
-// network problem, or a genuine "the browser can't decode this codec" failure.
-// Distinguishing these matters: the first two are almost always a bad path or a
-// file that never uploaded, not a format problem.
-function describeMediaError(audioEl, label){
-  const err = audioEl.error;
-  const code = err ? err.code : null;
-  if(code === 2) return '"' + label + '" couldn\'t be loaded — the file wasn\'t found (check the path/upload, not the format)';
-  if(code === 4) return '"' + label + '" is a format this browser can\'t play at all (unsupported codec/container)';
-  if(code === 3) return '"' + label + '" downloaded but the browser couldn\'t decode the audio data (corrupt file or unusual codec settings)';
-  if(code === 1) return '"' + label + '" playback was aborted';
-  return '"' + label + '" couldn\'t be played (unknown error)';
-}
-// Map of extension -> correct MIME type. Blob URLs inherit whatever MIME type the
-// File object reports, and many OS file pickers report a blank or generic type
-// (application/octet-stream, or nothing at all) for .wav and other non-mp3 files.
-// Some browsers then refuse to decode the blob URL because its Content-Type doesn't
-// look like audio, even though the underlying file is completely valid. Re-wrapping
-// the file with the correct type before creating the object URL fixes that.
-const extMimeMap = {
-  mp3:'audio/mpeg', wav:'audio/wav', wave:'audio/wav', ogg:'audio/ogg', oga:'audio/ogg',
-  opus:'audio/ogg', m4a:'audio/mp4', mp4:'audio/mp4', aac:'audio/aac', flac:'audio/flac',
-  weba:'audio/webm', webm:'audio/webm', '3gp':'audio/3gpp'
-};
-function fileExt(file){ return (file.name.split('.').pop() || '').toLowerCase(); }
-
-function objectUrlFor(file){
-  const ext = fileExt(file);
-  const correctType = extMimeMap[ext];
-  if(correctType && file.type !== correctType){
-    return URL.createObjectURL(new Blob([file], { type: correctType }));
-  }
-  return URL.createObjectURL(file);
-}
-
-function likelyPlayable(file){
-  const ext = fileExt(file);
-  const correctType = extMimeMap[ext] || file.type;
-  if(correctType && correctType.startsWith('audio/')){
-    return !!probeAudio.canPlayType(correctType);
-  }
-  const knownExt = Object.keys(extMimeMap);
-  return knownExt.includes(ext);
-}
-
-function assignClip(packName, key, file){
-  const pack = packs[packName];
-  if(pack[key] && pack[key].url && pack[key].url.startsWith('blob:')) URL.revokeObjectURL(pack[key].url);
-  const supported = likelyPlayable(file);
-  pack[key] = { url: objectUrlFor(file), name: file.name, unsure: !supported };
-  if(packName === activePack) renderSlot(key);
-  updatePreview();
-  if(!supported){
-    clipHint.textContent = '"' + file.name + '" has an unrecognized format — it may still play, but check it with the ▶ test button';
-    clipHint.classList.add('warn');
-  }
-}
-
-function renderSlot(key){
-  const entry = packs[activePack][key];
-  const slotEl = document.getElementById('slot-'+key);
-  const statusEl = document.getElementById('status-'+key);
-  const nameEl = document.getElementById('name-'+key);
-  const previewBtn = document.getElementById('preview-'+key);
-  if(entry){
-    slotEl.classList.add('loaded');
-    statusEl.textContent = entry.unsure ? 'loaded (unverified)' : 'loaded';
-    nameEl.textContent = entry.name;
-    previewBtn.style.display = 'block';
-  } else {
-    slotEl.classList.remove('loaded');
-    statusEl.textContent = 'empty';
-    nameEl.textContent = '';
-    previewBtn.style.display = 'none';
-  }
-}
-
-function renderAllSlots(){
-  slotDefs.forEach(def => renderSlot(def.key));
-}
-
-// ---------- bulk import ----------
-function baseName(filename){
-  const noExt = filename.replace(/\.[^/.]+$/, '');
-  return noExt.trim().toLowerCase();
-}
-bulkImport.addEventListener('change', (e)=>{
-  const files = Array.from(e.target.files || []);
-  let matched = 0, skipped = 0;
-  files.forEach(file=>{
-    const base = baseName(file.name);
-    let key = null;
-    if(slotKeySet.has(base)) key = base;
-    else if(base.startsWith('digit')){ const d = base.replace(/\D/g,''); if(slotKeySet.has(d)) key = d; }
-    else if(base.includes('atten')) key = 'attention';
-    else if(base.includes('end')) key = 'end';
-
-    if(key){ assignClip(activePack, key, file); matched++; }
-    else skipped++;
-  });
-  clipHint.textContent = `imported ${matched} clip(s)` + (skipped ? `, skipped ${skipped} unmatched file(s)` : '');
-  clipHint.classList.remove('warn');
-  e.target.value = '';
-});
-
-// ---------- pack management ----------
-function switchPack(name){
-  activePack = name;
-  refreshPackSelect();
-  renderAllSlots();
-  updatePreview();
-}
-packSelect.addEventListener('change', ()=> switchPack(packSelect.value));
-
-addPackBtn.addEventListener('click', ()=>{
-  let name = newPackName.value.trim();
-  if(!name) name = 'Pack ' + (Object.keys(packs).length + 1);
-  if(packs[name]){ clipHint.textContent = 'a pack named "'+name+'" already exists'; clipHint.classList.add('warn'); return; }
-  packs[name] = {};
-  newPackName.value = '';
-  switchPack(name);
-});
-
-deletePackBtn.addEventListener('click', ()=>{
-  const names = Object.keys(packs);
-  if(names.length <= 1){ clipHint.textContent = 'at least one pack must remain'; clipHint.classList.add('warn'); return; }
-  Object.values(packs[activePack]).forEach(entry => { if(entry.url.startsWith('blob:')) URL.revokeObjectURL(entry.url); });
-  delete packs[activePack];
-  switchPack(Object.keys(packs)[0]);
-});
-
-clearClipsBtn.addEventListener('click', ()=>{
-  Object.values(packs[activePack]).forEach(entry => { if(entry.url.startsWith('blob:')) URL.revokeObjectURL(entry.url); });
-  packs[activePack] = {};
-  renderAllSlots();
-  updatePreview();
-});
-
-// ---------- mode switch ----------
-function updateDigitGapVisibility(){
-  digitGapCtrl.style.display = (digitModeEl.checked || mode === 'custom') ? 'block' : 'none';
-}
-digitModeEl.addEventListener('change', updateDigitGapVisibility);
-updateDigitGapVisibility();
-
-function setMode(m){
-  mode = m;
-  modeBrowser.classList.toggle('active', m === 'browser');
-  modeCustom.classList.toggle('active', m === 'custom');
-  clipPanel.style.display = m === 'custom' ? 'block' : 'none';
-  voiceCtrl.classList.toggle('disabled', m === 'custom');
-  pitchCtrl.classList.toggle('disabled', m === 'custom');
-  if(m === 'custom'){
-    digitModeEl.checked = true;
-    digitModeEl.disabled = true;
-    digitModeToggle.classList.add('disabled');
-  } else {
-    digitModeEl.disabled = false;
-    digitModeToggle.classList.remove('disabled');
-  }
-  updateDigitGapVisibility();
-  updatePreview();
-  if(typeof updateOnAirToggleState === 'function') updateOnAirToggleState();
-}
-modeBrowser.addEventListener('click', ()=> setMode('browser'));
-modeCustom.addEventListener('click', ()=> setMode('custom'));
-
-// ---------- grouping + preview ----------
-function digitsOnly(str){ return (str.match(/\d/g) || []).join(''); }
-function groupString(digits, size){
-  const groups = [];
-  for(let i=0;i<digits.length;i+=size){ groups.push(digits.slice(i, i+size)); }
-  return groups;
-}
-function updatePreview(){
-  const digits = digitsOnly(numbersEl.value);
-  const size = Math.max(1, parseInt(groupSizeEl.value) || 5);
-  if(!digits){ previewEl.textContent = ''; return; }
-  previewEl.textContent = groupString(digits, size).join('  ·  ');
-
-  if(mode === 'custom'){
-    const needed = [...new Set(digits.split(''))];
-    const missing = needed.filter(d => !packs[activePack][d]);
-    if(missing.length){
-      clipHint.textContent = 'missing clips for: ' + missing.join(', ');
-      clipHint.classList.add('warn');
-    } else {
-      clipHint.textContent = 'all digits in your message have clips loaded';
-      clipHint.classList.remove('warn');
-    }
-  }
-}
-numbersEl.addEventListener('input', updatePreview);
-groupSizeEl.addEventListener('input', updatePreview);
-
-// ---------- slider labels ----------
-rateEl.addEventListener('input', ()=> rateVal.textContent = parseFloat(rateEl.value).toFixed(2));
-pitchEl.addEventListener('input', ()=> pitchVal.textContent = parseFloat(pitchEl.value).toFixed(2));
-volumeEl.addEventListener('input', ()=> volumeVal.textContent = parseFloat(volumeEl.value).toFixed(2));
-pauseEl.addEventListener('input', ()=> pauseVal.textContent = pauseEl.value + 'ms');
-digitGapEl.addEventListener('input', ()=> digitGapVal.textContent = digitGapEl.value + 'ms');
-repeatsEl.addEventListener('input', ()=> repeatsVal.textContent = repeatsEl.value + '×');
-
-specGainEl.addEventListener('input', ()=> specGainVal.textContent = parseFloat(specGainEl.value).toFixed(2) + '×');
-specZoomEl.addEventListener('input', ()=> specZoomVal.textContent = parseFloat(specZoomEl.value).toFixed(2) + '×');
-specMinFreqEl.addEventListener('input', ()=>{
-  let min = parseInt(specMinFreqEl.value), max = parseInt(specMaxFreqEl.value);
-  if(min > max - 100){ min = Math.max(0, max - 100); specMinFreqEl.value = min; }
-  specMinFreqVal.textContent = min + ' Hz';
-});
-specMaxFreqEl.addEventListener('input', ()=>{
-  let min = parseInt(specMinFreqEl.value), max = parseInt(specMaxFreqEl.value);
-  if(max < min + 100){ max = min + 100; specMaxFreqEl.value = max; }
-  specMaxFreqVal.textContent = max + ' Hz';
-});
-
-// ---------- build playback queue ----------
-function buildQueue(){
-  const digits = digitsOnly(numbersEl.value);
-  const size = Math.max(1, parseInt(groupSizeEl.value) || 5);
-  const groups = groupString(digits, size);
-  const repeats = parseInt(repeatsEl.value) || 1;
-  const digitMode = digitModeEl.checked || mode === 'custom';
-  const usePreamble = preambleEl.checked;
-  const groupPause = parseInt(pauseEl.value) || 0;
-  const gap = parseInt(digitGapEl.value) || 0;
-  const activeClips = packs[activePack];
-
-  const items = [];
-
-  function pushPhrase(key, text){
-    if(mode === 'custom'){
-      if(activeClips[key]) items.push({kind:'audio', url: activeClips[key].url, label: text, pauseAfter: 400});
-    } else {
-      items.push({kind:'tts', text, label: text, pauseAfter: 400});
-    }
-  }
-
-  for(let r=0; r<repeats; r++){
-    if(usePreamble) pushPhrase('attention', 'Attention. Attention.');
-
-    groups.forEach(g=>{
-      if(mode === 'custom'){
-        const digitsArr = g.split('');
-        digitsArr.forEach((d, i)=>{
-          if(activeClips[d]){
-            items.push({kind:'audio', url: activeClips[d].url, label: d, pauseAfter: i === digitsArr.length-1 ? groupPause : gap});
-          }
-        });
-      } else if(digitMode){
-        const digitsArr = g.split('');
-        digitsArr.forEach((d, i)=>{
-          items.push({kind:'tts', text: digitWords[parseInt(d)], label: d, pauseAfter: i === digitsArr.length-1 ? groupPause : gap});
-        });
-      } else {
-        items.push({kind:'tts', text: g, label: g, pauseAfter: groupPause});
+      const port = await navigator.serial.requestPort();
+      const framing = $('catFraming').value;
+      await port.open({
+        baudRate: parseInt($('catBaud').value,10),
+        dataBits: 8,
+        stopBits: framing === '8n2' ? 2 : 1,
+        parity: 'none',
+      });
+      S.port = port;
+      // Opening a serial port commonly asserts RTS/DTR HIGH by default at the
+      // driver level. Many cheap CAT/audio interfaces (Xiegu CE-19/DE-19
+      // family included) wire RTS as a hardware PTT line — so without this,
+      // the instant the port opens, the interface reads "key transmitter"
+      // before any CAT command has been sent. De-assert both immediately.
+      try{
+        await port.setSignals({dataTerminalReady:false, requestToSend:false});
+      }catch(err){
+        console.warn('setSignals not supported / failed — RTS/DTR state on connect is undefined on this platform', err);
       }
+      S.catWriter = port.writable.getWriter();
+      S.catReader = port.readable.getReader();
+      $('btnCat').classList.add('connected');
+      $('catState').textContent = 'connected · ' + $('catBaud').value + ' baud';
+      setDot('dotCat','on');
+      $('btnPanicRelease').style.display = 'block';
+    }catch(err){
+      console.error(err);
+      alert('CAT connection failed or was cancelled: '+err.message);
+    }
+  }
+
+  async function catSend(bytes){
+    if(!S.catWriter) return null;
+    await S.catWriter.write(new Uint8Array(bytes));
+  }
+
+  async function catReadResponse(timeoutMs=800){
+    // Read bytes until an FD terminator shows up, or timeout.
+    if(!S.catReader) return null;
+    const chunks = [];
+    let total = 0;
+    const deadline = Date.now() + timeoutMs;
+    while(Date.now() < deadline){
+      const timeout = new Promise(res=>setTimeout(()=>res(null), Math.max(0,deadline-Date.now())));
+      const result = await Promise.race([S.catReader.read(), timeout]);
+      if(!result || result.done) break;
+      chunks.push(result.value);
+      total += result.value.length;
+      if(result.value.includes(0xFD)) break;
+    }
+    if(!chunks.length) return null;
+    const buf = new Uint8Array(total);
+    let off=0;
+    for(const c of chunks){ buf.set(c, off); off += c.length; }
+    return buf;
+  }
+
+  async function setFrequency(hz){
+    if(!S.catWriter){ alert('Connect CAT first.'); return; }
+    await catSend(civFrame(0x05, [...civFreqBytes(hz)]));
+    S.frequencyHz = hz;
+    updateVfoDisplay();
+  }
+
+  async function readFrequency(){
+    if(!S.catWriter){ alert('Connect CAT first.'); return; }
+    await catSend(civFrame(0x03, []));
+    const resp = await catReadResponse();
+    if(!resp || resp.length < 11){ $('vfoMode').textContent = 'MODE — (no reply)'; return; }
+    // Expect: FE FE <to> <from> 03 <5 freq bytes LSB-first BCD> FD
+    const fdIdx = resp.indexOf(0xFD);
+    const cmdIdx = resp.indexOf(0x03, 4);
+    if(fdIdx < 0 || cmdIdx < 0 || fdIdx - cmdIdx < 6){ $('vfoMode').textContent='MODE — (bad frame)'; return; }
+    const fbytes = resp.slice(cmdIdx+1, cmdIdx+6);
+    let hz = 0, mult = 1;
+    for(let i=0;i<5;i++){
+      const b = fbytes[i];
+      const lo = (b>>4)&0xF, hi = b&0xF;
+      hz += lo*mult*10 + hi*mult;
+      mult *= 100;
+    }
+    if(hz > 0){ S.frequencyHz = hz; updateVfoDisplay(); }
+    $('vfoMode').textContent = 'CI-V OK';
+  }
+
+  function updateVfoDisplay(){
+    const mhz = (S.frequencyHz/1e6).toFixed(6);
+    $('vfoHz').textContent = mhz;
+    $('freqSet').value = mhz;
+  }
+
+  async function catPTT(on){
+    if(!S.catWriter) return;
+    // Icom transceive TX ON/OFF: cmd 0x1C 0x00, data 0x01 (on) / 0x00 (off)
+    await catSend(civFrame([0x1C,0x00], [on ? 0x01 : 0x00]));
+  }
+
+  async function serialLinePTT(on, line){
+    if(!S.port) return;
+    const signals = line === 'dtr'
+      ? {dataTerminalReady: on}
+      : {requestToSend: on};
+    await S.port.setSignals(signals);
+  }
+
+  $('btnCat').addEventListener('click', connectCAT);
+  $('btnSetFreq').addEventListener('click', ()=>{
+    const mhz = parseFloat($('freqSet').value);
+    if(isNaN(mhz)){ alert('Enter a frequency in MHz, e.g. 14.074000'); return; }
+    setFrequency(Math.round(mhz*1e6));
+  });
+  $('btnReadFreq').addEventListener('click', readFrequency);
+
+  // =====================================================================
+  // PTT via WebHID (CM108-style GPIO, common on USB sound-card interfaces)
+  // =====================================================================
+  async function connectHID(){
+    if(!hasHid){ alert('WebHID is not available in this browser.'); return; }
+    try{
+      const devices = await navigator.hid.requestDevice({filters:[]});
+      if(!devices.length) return;
+      S.hid = devices[0];
+      if(!S.hid.opened) await S.hid.open();
+      $('btnHid').classList.add('connected');
+      $('hidState').textContent = 'connected · ' + (S.hid.productName || 'HID device');
+      setDot('dotHid','on');
+    }catch(err){
+      console.error(err);
+      alert('PTT interface connection failed: '+err.message);
+    }
+  }
+
+  async function hidPTT(on){
+    if(!S.hid) return;
+    const bit = parseInt($('cm108Bit').value,10);
+    const mask = 1 << (bit-1);
+    // CM108-family: output report — byte0 = GPIO data mask select, byte1 = GPIO state
+    const report = new Uint8Array([0x00, on ? mask : 0x00, 0x00, 0x00]);
+    try{
+      await S.hid.sendReport(0x00, report);
+    }catch(err){
+      console.warn('HID report failed, retrying as feature report', err);
+      try{ await S.hid.sendFeatureReport(0x00, report); }catch(e){ console.error(e); }
+    }
+  }
+
+  $('btnHid').addEventListener('click', connectHID);
+
+  // =====================================================================
+  // AUDIO — capture (waterfall) + output routing (image TX, tune tone)
+  // =====================================================================
+  async function connectAudio(){
+    try{
+      S.audioCtx = S.audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+      if(S.audioCtx.state === 'suspended') await S.audioCtx.resume();
+      S.micStream = await navigator.mediaDevices.getUserMedia({audio:{
+        deviceId: $('audioInSelect').value ? {exact:$('audioInSelect').value} : undefined,
+        echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+      }});
+      S.micSource = S.audioCtx.createMediaStreamSource(S.micStream);
+      S.analyser = S.audioCtx.createAnalyser();
+      S.analyser.fftSize = S.waterfall.fft;
+      S.analyser.smoothingTimeConstant = 0.15;
+      S.micSource.connect(S.analyser);
+
+      // output element for routed playback (setSinkId support)
+      if(!S.outEl){
+        S.outEl = document.createElement('audio');
+        S.outEl.autoplay = true;
+        document.body.appendChild(S.outEl);
+      }
+      S.outDest = S.audioCtx.createMediaStreamDestination();
+      S.outEl.srcObject = S.outDest.stream;
+
+      await refreshDeviceList();
+      $('btnAudio').classList.add('connected');
+      $('audioState').textContent = 'connected';
+      setDot('dotAudioIn','on');
+      setDot('dotAudioOut','warn');
+      applyOutputSink();
+    }catch(err){
+      console.error(err);
+      alert('Audio connection failed: '+err.message);
+    }
+  }
+
+  async function refreshDeviceList(){
+    try{
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const ins = devices.filter(d=>d.kind==='audioinput');
+      const outs = devices.filter(d=>d.kind==='audiooutput');
+      const inSel = $('audioInSelect'), outSel = $('audioOutSelect');
+      inSel.innerHTML = ins.map(d=>`<option value="${d.deviceId}">${d.label||'Input device'}</option>`).join('') || '<option value="">No inputs found</option>';
+      outSel.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Output device'}</option>`).join('') || '<option value="">No outputs found</option>';
+      // guess DE-19 by label
+      [...inSel.options].forEach(o=>{ if(/de-?19/i.test(o.textContent)) inSel.value=o.value; });
+      [...outSel.options].forEach(o=>{ if(/de-?19/i.test(o.textContent)) outSel.value=o.value; });
+    }catch(err){ console.warn(err); }
+  }
+
+  async function applyOutputSink(){
+    if(!S.outEl || !S.outEl.setSinkId) { setDot('dotAudioOut','warn'); return; }
+    const id = $('audioOutSelect').value;
+    if(!id) return;
+    try{
+      await S.outEl.setSinkId(id);
+      setDot('dotAudioOut','on');
+    }catch(err){
+      console.warn('setSinkId failed', err);
+      setDot('dotAudioOut','warn');
+    }
+  }
+
+  $('btnAudio').addEventListener('click', connectAudio);
+  $('btnRefreshDevices').addEventListener('click', refreshDeviceList);
+  $('audioOutSelect').addEventListener('change', applyOutputSink);
+  $('audioInSelect').addEventListener('change', ()=>{ if(S.micStream) connectAudio(); });
+
+  // =====================================================================
+  // WATERFALL RENDER (receive)
+  // =====================================================================
+  const canvas = $('waterfall');
+  const ctx = canvas.getContext('2d');
+  let dpr = window.devicePixelRatio||1;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width*dpr));
+    canvas.height = Math.max(1, Math.round(rect.height*dpr));
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function palette(t, name){ // t in [0,1] -> [r,g,b]
+    t = Math.min(1,Math.max(0,t));
+    switch(name){
+      case 'amber': return [Math.round(255*t), Math.round(180*t*t), Math.round(40*t*t)];
+      case 'ice': return [Math.round(60*t*t), Math.round(180*t), Math.round(255*Math.pow(t,0.7))];
+      case 'classic': {
+        // blue -> cyan -> yellow -> red
+        const stops = [[10,10,80],[0,180,220],[255,230,60],[220,30,30]];
+        const seg = t*(stops.length-1);
+        const i = Math.min(stops.length-2, Math.floor(seg));
+        const f = seg-i;
+        return stops[i].map((c,k)=>Math.round(c+(stops[i+1][k]-c)*f));
+      }
+      default: return [Math.round(20*t), Math.round(255*Math.pow(t,0.8)), Math.round(60*t*t)]; // phosphor
+    }
+  }
+
+  let freqData;
+  function animateWaterfall(){
+    if(!S.waterfall.running) return;
+    requestAnimationFrame(animateWaterfall);
+    if(!S.analyser) return;
+
+    const w = canvas.width, h = canvas.height;
+    if(!freqData || freqData.length !== S.analyser.frequencyBinCount){
+      freqData = new Uint8Array(S.analyser.frequencyBinCount);
+    }
+    S.analyser.getByteFrequencyData(freqData);
+
+    const speedPx = S.waterfall.speed; // rows per frame
+    // shift image up
+    const imgData = ctx.getImageData(0, speedPx, w, h-speedPx);
+    ctx.putImageData(imgData, 0, 0);
+
+    const sr = S.audioCtx.sampleRate;
+    const nyquist = sr/2;
+    const binHz = nyquist / freqData.length;
+    const minBin = Math.floor(S.waterfall.min / binHz);
+    const maxBin = Math.min(freqData.length-1, Math.ceil(S.waterfall.max / binHz));
+    const span = Math.max(1, maxBin-minBin);
+
+    for(let row=0; row<speedPx; row++){
+      for(let x=0; x<w; x++){
+        const bin = minBin + Math.floor((x/w)*span);
+        const v = (freqData[bin]||0)/255 * S.waterfall.gain;
+        const [r,g,b] = palette(v, S.waterfall.palette);
+        const idx = ((h-speedPx+row)*w + x)*4;
+        // draw directly via fillRect for perf fallback below
+      }
+    }
+    // faster path: build one row and drawImage-scale
+    const rowCanvas = document.createElement('canvas');
+    rowCanvas.width = span; rowCanvas.height = 1;
+    const rctx = rowCanvas.getContext('2d');
+    const rowImg = rctx.createImageData(span,1);
+    for(let i=0;i<span;i++){
+      const bin = minBin+i;
+      const v = (freqData[bin]||0)/255 * S.waterfall.gain;
+      const [r,g,b] = palette(v, S.waterfall.palette);
+      rowImg.data[i*4]=r; rowImg.data[i*4+1]=g; rowImg.data[i*4+2]=b; rowImg.data[i*4+3]=255;
+    }
+    rctx.putImageData(rowImg,0,0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(rowCanvas, 0, 0, span, 1, 0, h-speedPx, w, speedPx);
+  }
+
+  // =====================================================================
+  // TX PREVIEW — while transmitting an image/text, the mic usually isn't
+  // hearing our own signal, so the live receive waterfall has nothing to
+  // show. Instead, render what we're SENDING onto the same canvas, using
+  // the exact same axis convention (frequency horizontal, time vertical,
+  // growing from the bottom) so it looks like a continuation of the real
+  // waterfall rather than a different view.
+  // =====================================================================
+  function buildTxPreviewCanvas(matrix, rows, cols, paletteName){
+    const c = document.createElement('canvas');
+    c.width = rows; c.height = cols;
+    const cx = c.getContext('2d');
+    const imgData = cx.createImageData(rows, cols);
+    for(let t=0; t<cols; t++){
+      for(let f=0; f<rows; f++){
+        const v = matrix[f][t];
+        const [r,g,b] = palette(v, paletteName);
+        const idx = (t*rows+f)*4;
+        imgData.data[idx]=r; imgData.data[idx+1]=g; imgData.data[idx+2]=b; imgData.data[idx+3]=255;
+      }
+    }
+    cx.putImageData(imgData,0,0);
+    return c;
+  }
+
+  function startTxPreview(matrix, rows, cols, durationMs){
+    if(!matrix) return;
+    S.txPreviewCanvas = buildTxPreviewCanvas(matrix, rows, cols, S.waterfall.palette);
+    S.txPreviewCols = cols;
+    S.txStartTime = performance.now();
+    S.txDurationMs = Math.max(1, durationMs);
+    S.wasWaterfallRunning = S.waterfall.running;
+    S.waterfall.running = false; // pause the live receive loop while we own the canvas
+    S.txPreviewActive = true;
+    $('scopeTxBadge').style.display = 'inline';
+    animateTxPreview();
+  }
+
+  function stopTxPreview(){
+    S.txPreviewActive = false;
+    $('scopeTxBadge').style.display = 'none';
+    if(S.wasWaterfallRunning){
+      S.waterfall.running = true;
+      animateWaterfall();
+    }
+  }
+
+  function animateTxPreview(){
+    if(!S.txPreviewActive) return;
+    requestAnimationFrame(animateTxPreview);
+    const w = canvas.width, h = canvas.height;
+    const elapsed = performance.now() - S.txStartTime;
+    const progress = Math.min(1, elapsed / S.txDurationMs);
+    const revealedRows = Math.max(1, Math.ceil(progress * S.txPreviewCols));
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,w,h);
+    ctx.imageSmoothingEnabled = false;
+    const destH = Math.max(1, Math.round((revealedRows/S.txPreviewCols) * h));
+    // anchor to the bottom and grow upward, matching the live loop's
+    // "newest data enters at the bottom" convention
+    ctx.drawImage(S.txPreviewCanvas, 0, 0, S.txPreviewCanvas.width, revealedRows, 0, h-destH, w, destH);
+  }
+
+  $('btnStartWaterfall').addEventListener('click', ()=>{
+    if(!S.analyser){ alert('Connect DE‑19 audio first.'); return; }
+    S.waterfall.running = !S.waterfall.running;
+    $('btnStartWaterfall').textContent = S.waterfall.running ? '■ Stop' : '▶ Start';
+    if(S.waterfall.running) animateWaterfall();
+  });
+
+  function updateFreqLabels(){
+    $('wfMinLabel').textContent = S.waterfall.min+' Hz';
+    $('wfMaxLabel').textContent = S.waterfall.max+' Hz';
+    $('wfCenterLabel').textContent = Math.round((S.waterfall.min+S.waterfall.max)/2)+' Hz';
+  }
+
+  // =====================================================================
+  // IMAGE → WATERFALL AUDIO (additive synthesis / inverse spectrogram)
+  // =====================================================================
+  let loadedImage = null;
+
+  function loadImageFile(file){
+    if(!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        loadedImage = img;
+        $('imgPreview').src = e.target.result;
+        $('imgPreview').style.display = 'block';
+        autoDetectInvert(img);
+        // Same fix as the text-typing feature: fit a mismatched aspect ratio
+        // into the default grid wastes most of the time budget as silent
+        // padding, which is also what was crushing detail (eyes/mouth) out
+        // of the smiley — auto-match Time columns to this image's actual
+        // proportions against the current Frequency rows.
+        const rowsSetting = parseInt($('imgRows').value,10) || 64;
+        const neededCols = Math.round(rowsSetting * (img.naturalHeight/img.naturalWidth));
+        const clampedCols = Math.max(20, Math.min(400, neededCols));
+        $('imgCols').value = clampedCols;
+        $('imgInfo').textContent = `${img.naturalWidth}×${img.naturalHeight}px — time columns auto-set to ${clampedCols} to match, ready to render`;
+        $('btnRenderImage').disabled = false;
+        updateDurationEstimate();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function autoDetectInvert(img){
+    // A typical photo of dark text on a light background (paper, a screen,
+    // a whiteboard) has an average brightness well above 50% — but this
+    // encoder treats bright pixels as "signal on", so it would transmit the
+    // background instead of the subject. Pre-tick Invert automatically when
+    // the source looks light-background; the person can still override it.
+    const s = document.createElement('canvas');
+    s.width = 40; s.height = 40;
+    const sx = s.getContext('2d');
+    sx.drawImage(img, 0, 0, 40, 40);
+    const d = sx.getImageData(0,0,40,40).data;
+    let sum = 0;
+    for(let i=0;i<d.length;i+=4){ sum += (0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]); }
+    const meanBrightness = sum / (d.length/4) / 255;
+    $('imgInvert').checked = meanBrightness > 0.5;
+  }
+
+  $('dropZone').addEventListener('click', ()=>$('fileInput').click());
+  $('fileInput').addEventListener('change', e=>loadImageFile(e.target.files[0]));
+  ['dragover','dragleave','drop'].forEach(evt=>{
+    $('dropZone').addEventListener(evt, e=>{
+      e.preventDefault();
+      $('dropZone').classList.toggle('drag', evt==='dragover');
+      if(evt==='drop') loadImageFile(e.dataTransfer.files[0]);
     });
-
-    if(usePreamble) pushPhrase('end', 'End of message.');
-  }
-  return items;
-}
-
-// ---------- playback engine ----------
-let queue = [];
-let queueIndex = 0;
-let stopRequested = false;
-let pauseRequested = false;
-let currentAudioEl = null;
-let isPlayingFlag = false;
-
-function setUiPlaying(playing){
-  isPlayingFlag = playing;
-  playBtn.disabled = playing;
-  pauseBtn.disabled = !playing;
-  stopBtn.disabled = !playing;
-  statusText.textContent = playing ? 'TRANSMITTING' : 'STANDBY';
-  readout.classList.toggle('idle', !playing);
-  if(playing){ startMeter(); startSpectro(); } else { stopMeter(); stopSpectro(); }
-}
-
-function sleep(ms){
-  return new Promise(resolve=>{
-    const step = 80;
-    let elapsed = 0;
-    const iv = setInterval(()=>{
-      if(stopRequested){ clearInterval(iv); resolve(); return; }
-      if(!pauseRequested){ elapsed += step; }
-      if(elapsed >= ms){ clearInterval(iv); resolve(); }
-    }, step);
   });
-}
 
-function playAudioItem(item){
-  return new Promise(resolve=>{
-    const a = new Audio(item.url);
-    a.playbackRate = parseFloat(rateEl.value);
-    a.volume = parseFloat(volumeEl.value);
-    currentAudioEl = a;
-    connectAnalyserSource(a);
-    a.onended = ()=>{ currentAudioEl = null; resolve(); };
-    a.onerror = ()=>{ readout.textContent = describeMediaError(a, item.label) + ' — skipping'; currentAudioEl = null; resolve(); };
-    a.play().catch((playErr)=>{ readout.textContent = (a.error ? describeMediaError(a, item.label) : ('"' + item.label + '" was blocked from playing: ' + playErr.message)) + ' — skipping'; currentAudioEl = null; resolve(); });
+  function renderTextToCanvas(text){
+    const c = document.createElement('canvas');
+    const fontSize = 90;
+    const measure = c.getContext('2d');
+    measure.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+    const textWidth = Math.ceil(measure.measureText(text || ' ').width);
+    c.width = Math.max(120, textWidth + fontSize);
+    c.height = Math.round(fontSize*1.6);
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0,0,c.width,c.height);
+    cx.fillStyle = '#fff';
+    cx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+    cx.textBaseline = 'middle';
+    cx.fillText(text, fontSize*0.4, c.height/2);
+    return c;
+  }
+
+  $('btnRenderText').addEventListener('click', ()=>{
+    const txt = $('textInput').value.trim();
+    if(!txt) return;
+    const canvasImg = renderTextToCanvas(txt);
+    loadedImage = canvasImg;
+    $('imgInvert').checked = false; // rendered text is always white-on-black already
+
+    // Text is naturally landscape (wide, short) but the default grid
+    // (Frequency rows × Time columns) is portrait-shaped — fitting a
+    // landscape image into a portrait box wastes most of the time budget as
+    // silent padding, which is what compresses the letters into a thin,
+    // hard-to-read band. Auto-adjust Time columns to match this text's
+    // actual proportions against the current Frequency rows, so it fills
+    // the transmission instead of mostly padding it.
+    const rowsSetting = parseInt($('imgRows').value,10) || 64;
+    const neededCols = Math.round(rowsSetting * (canvasImg.height/canvasImg.width));
+    const clampedCols = Math.max(20, Math.min(400, neededCols));
+    $('imgCols').value = clampedCols;
+
+    $('imgPreview').src = canvasImg.toDataURL();
+    $('imgPreview').style.display = 'block';
+    $('imgInfo').textContent = `Text: "${txt}" — time columns auto-set to ${clampedCols} to match, ready to render`;
+    $('btnRenderImage').disabled = false;
+    updateDurationEstimate();
   });
-}
 
-function playTtsItem(item){
-  return new Promise(resolve=>{
-    const utter = new SpeechSynthesisUtterance(item.text);
-    const vIdx = voiceSelect.value;
-    if(voices[vIdx]) utter.voice = voices[vIdx];
-    utter.rate = parseFloat(rateEl.value);
-    utter.pitch = parseFloat(pitchEl.value);
-    utter.volume = parseFloat(volumeEl.value);
-    utter.onend = resolve;
-    utter.onerror = resolve;
-    window.speechSynthesis.speak(utter);
-  });
-}
-
-async function runQueue(){
-  while(queueIndex < queue.length){
-    if(stopRequested) break;
-    while(pauseRequested && !stopRequested){ await sleep(100); }
-    if(stopRequested) break;
-
-    const item = queue[queueIndex];
-    readout.textContent = item.kind === 'audio' ? ('clip  ' + item.label) : item.text.toLowerCase();
-    petPttWatchdog();
-
-    if(item.kind === 'audio') await playAudioItem(item);
-    else await playTtsItem(item);
-
-    if(stopRequested) break;
-    if(item.pauseAfter) await sleep(item.pauseAfter);
-    queueIndex++;
-  }
-  finishPlayback();
-}
-
-function finishPlayback(){
-  setUiPlaying(false);
-  readout.textContent = 'awaiting traffic';
-  statusText.textContent = 'STANDBY';
-  pauseBtn.textContent = '‖ hold';
-  pauseRequested = false;
-  if(R.pttEngaged) disablePTT();
-}
-
-playBtn.addEventListener('click', async ()=>{
-  const digits = digitsOnly(numbersEl.value);
-  if(!digits){ readout.textContent = 'no digits found in input'; return; }
-
-  if(mode === 'custom'){
-    const needed = [...new Set(digits.split(''))];
-    const missing = needed.filter(d => !packs[activePack][d]);
-    if(missing.length){ readout.textContent = 'missing clips for: ' + missing.join(', '); return; }
+  function updateDurationEstimate(){
+    const cols = parseInt($('imgCols').value,10);
+    const frame = parseFloat($('imgFrame').value);
+    $('imgDurationHint').textContent = `Estimated transmit time: ~${(cols*frame).toFixed(1)} s`;
   }
 
-  const wantsRadio = $r('txToRadioToggle').checked;
-  if(wantsRadio && mode !== 'custom'){
-    readout.textContent = 'radio transmit needs custom audio clips mode — browser voices can\'t be routed to hardware audio out';
-    return;
+  function imageToMatrix(img, cols, rows, gamma, invert, flipH, flipV){
+    // The receive waterfall plots frequency HORIZONTALLY and time VERTICALLY
+    // (top = earliest, bottom = most recent) — the usual ham-radio waterfall
+    // convention (WSJT-X/fldigi-style), not the audio-engineering spectrogram
+    // convention (time horizontal). So the source image must be sampled onto
+    // a canvas sized width=rows (frequency axis) x height=cols (time axis).
+    const off = document.createElement('canvas');
+    off.width = rows; off.height = cols;
+    const octx = off.getContext('2d');
+    octx.fillStyle = '#000';
+    octx.fillRect(0, 0, rows, cols); // black = silence, used as letterbox padding below
+
+    // Fit the source image into the rows×cols box preserving its aspect
+    // ratio (letterbox/pillarbox with silent padding) instead of stretching
+    // it to fill both dimensions exactly — a straight stretch is what turns
+    // a wide photo squeezed into a tall narrow grid into an unrecognisable
+    // smear.
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const fitScale = Math.min(rows/iw, cols/ih);
+    const dw = iw*fitScale, dh = ih*fitScale;
+    const dx = (rows-dw)/2, dy = (cols-dh)/2;
+
+    // Flip H mirrors along the frequency axis (left↔right in the
+    // waterfall), flip V mirrors along the time axis (top↔bottom, i.e.
+    // which end of the image is transmitted first). Applied as a full
+    // canvas-space transform before drawing so it works regardless of the
+    // letterbox offset above.
+    octx.save();
+    if(flipH || flipV){
+      octx.translate(flipH ? rows : 0, flipV ? cols : 0);
+      octx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+    }
+    octx.drawImage(img, dx, dy, dw, dh);
+    octx.restore();
+
+    const data = octx.getImageData(0,0,rows,cols).data;
+    const matrix = []; // matrix[freqRow][timeCol] = 0..1 brightness
+    for(let r=0;r<rows;r++) matrix[r] = new Float32Array(cols);
+    for(let c=0;c<cols;c++){
+      for(let r=0;r<rows;r++){
+        const idx = (c*rows+r)*4;
+        let gray = (0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2]) / 255;
+        if(invert) gray = 1 - gray;
+        matrix[r][c] = Math.pow(gray, gamma);
+      }
+    }
+    return matrix;
   }
 
-  window.speechSynthesis.cancel();
-  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
+  // =====================================================================
+  // Minimal iterative radix-2 FFT (in place, Cooley–Tukey). Used both to
+  // synthesize audio from the image (inverse FFT per frame) — this is the
+  // core of the rewritten encoder below.
+  // =====================================================================
+  function fft(re, im, invert){
+    const n = re.length;
+    for(let i=1, j=0; i<n; i++){
+      let bit = n>>1;
+      for(; j&bit; bit>>=1) j ^= bit;
+      j ^= bit;
+      if(i<j){
+        let t=re[i]; re[i]=re[j]; re[j]=t;
+        t=im[i]; im[i]=im[j]; im[j]=t;
+      }
+    }
+    for(let len=2; len<=n; len<<=1){
+      const ang = (invert ? 2 : -2)*Math.PI/len;
+      const wr0 = Math.cos(ang), wi0 = Math.sin(ang);
+      for(let i=0;i<n;i+=len){
+        let curWr=1, curWi=0;
+        for(let j=0;j<len/2;j++){
+          const ur=re[i+j], ui=im[i+j];
+          const vr=re[i+j+len/2]*curWr - im[i+j+len/2]*curWi;
+          const vi=re[i+j+len/2]*curWi + im[i+j+len/2]*curWr;
+          re[i+j]=ur+vr; im[i+j]=ui+vi;
+          re[i+j+len/2]=ur-vr; im[i+j+len/2]=ui-vi;
+          const nwr = curWr*wr0 - curWi*wi0;
+          const nwi = curWr*wi0 + curWi*wr0;
+          curWr=nwr; curWi=nwi;
+        }
+      }
+    }
+    if(invert){ for(let i=0;i<n;i++){ re[i]/=n; im[i]/=n; } }
+  }
 
-  queue = buildQueue();
-  queueIndex = 0;
-  stopRequested = false;
-  pauseRequested = false;
+  function renderImageToBuffer(){
+    if(!loadedImage || !S.audioCtx){
+      if(!S.audioCtx) S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    }
+    const cols = parseInt($('imgCols').value,10);
+    const rows = parseInt($('imgRows').value,10);
+    const frameSec = parseFloat($('imgFrame').value);
+    const gamma = parseFloat($('imgGamma').value);
+    const invert = $('imgInvert').checked;
+    const flipH = $('imgFlipH').checked;
+    const flipV = $('imgFlipV').checked;
+    const minF = S.waterfall.min, maxF = S.waterfall.max;
+    const sr = S.audioCtx.sampleRate;
 
-  if(wantsRadio){
-    if(!R.radioOutConnected){ readout.textContent = 'connect radio audio out first (radio link panel)'; return; }
+    const matrix = imageToMatrix(loadedImage, cols, rows, gamma, invert, flipH, flipV);
+
+    // ---- Inverse-STFT / overlap-add synthesis -------------------------
+    // Instead of switching discrete tones on and off (which splatters
+    // energy into neighbouring frequencies every time a tone's amplitude
+    // steps abruptly), each image column becomes one target magnitude
+    // spectrum, and consecutive Hann-windowed, 50%-overlapping frames are
+    // inverse-FFT'd and summed. This is the same principle used to make a
+    // clean, sharp picture appear in a real spectrogram, and it's dramatically
+    // less prone to the smeared/grainy look block-based tone-switching gives.
+    const N = 2048;               // FFT size — sets frequency resolution
+    const hop = N/4;              // 75% overlap — finer time resolution and a
+                                   // smoother reconstruction than 50%; periodic
+                                   // Hann still satisfies COLA at this hop size.
+    const hopsPerCol = Math.max(1, Math.round(frameSec*sr/hop));
+    const totalHops = hopsPerCol*cols;
+    const totalSamples = totalHops*hop + N;
+    const out = new Float32Array(totalSamples);
+    const win = new Float32Array(N);
+    // Periodic Hann (denominator N, not N-1) — this is what actually
+    // satisfies the constant-overlap-add condition. Using the "symmetric"
+    // Hann formula here was the bug behind the earlier concentric
+    // ripple/comb pattern: overlapping symmetric windows don't sum to a
+    // constant, so the reconstruction gets a periodic amplitude modulation
+    // stamped across the whole image.
+    for(let i=0;i<N;i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/N);
+
+    const binHz = sr/N;
+    const minBin = minF/binHz, maxBin = Math.min(N/2, maxF/binHz);
+    const loBin = Math.max(0, Math.ceil(minBin)), hiBin = Math.floor(maxBin);
+    const phase = new Float64Array(N/2+1); // persistent per-bin phase for click-free continuity
+
+    $('txProgressTrack').style.display = 'block';
+
+    // Precompute one target magnitude spectrum per image column (each
+    // already power-normalized and interpolated onto real FFT bins).
+    const magByCol = [];
+    for(let c=0;c<cols;c++){
+      let activeCount = 0;
+      for(let r=0;r<rows;r++){ if(matrix[r][c] >= 0.03) activeCount++; }
+      const colScale = activeCount > 0 ? 1/Math.sqrt(activeCount) : 0;
+      const mag = new Float64Array(N/2+1);
+      for(let bin=loBin; bin<=hiBin; bin++){
+        const t = (bin-minBin)/(maxBin-minBin);
+        const rPos = Math.min(rows-1, Math.max(0, t*(rows-1)));
+        const r0 = Math.floor(rPos), r1 = Math.min(rows-1, r0+1);
+        const frac = rPos-r0;
+        mag[bin] = (matrix[r0][c]*(1-frac) + matrix[r1][c]*frac) * colScale;
+      }
+      magByCol.push(mag);
+    }
+
+    // Walk hop-by-hop across the WHOLE transmission and cross-fade linearly
+    // between each column's spectrum and the next, rather than holding one
+    // column's spectrum static and jumping abruptly at the boundary. That
+    // abrupt jump was still injecting a broadband transient at every column
+    // edge even with the windowing fix — smoothing it out in time, on top of
+    // the frequency-axis interpolation already in place, is what should
+    // finally kill the remaining ghosting/ripple that's software-side.
+    for(let hopIndex=0; hopIndex<totalHops; hopIndex++){
+      const cf = hopIndex/hopsPerCol;
+      const c0 = Math.min(cols-1, Math.floor(cf));
+      const c1 = Math.min(cols-1, c0+1);
+      const tfrac = cf-c0;
+      const magA = magByCol[c0], magB = magByCol[c1];
+
+      const re = new Float64Array(N), im = new Float64Array(N);
+      for(let bin=loBin; bin<=hiBin; bin++){
+        phase[bin] += 2*Math.PI*bin*hop/N; // always advance, even when silent, so re-entry has no phase jump
+        const m = magA[bin]*(1-tfrac) + magB[bin]*tfrac;
+        if(m > 1e-6){
+          re[bin] = m*Math.cos(phase[bin]);
+          im[bin] = m*Math.sin(phase[bin]);
+          if(bin>0 && bin<N/2){ re[N-bin]=re[bin]; im[N-bin]=-im[bin]; } // conjugate symmetry -> real output
+        }
+      }
+      // still advance phase for bins outside the used range so it stays consistent
+      for(let bin=0; bin<loBin; bin++) phase[bin] += 2*Math.PI*bin*hop/N;
+      for(let bin=hiBin+1; bin<=N/2; bin++) phase[bin] += 2*Math.PI*bin*hop/N;
+
+      fft(re, im, true);
+      const base = hopIndex*hop;
+      for(let i=0;i<N;i++){ out[base+i] += re[i]*win[i]; }
+
+      if(hopIndex % 20 === 0){
+        $('txProgressFill').style.width = Math.round((hopIndex/totalHops)*100)+'%';
+      }
+    }
+
+    // Global normalize to a safe peak, then a gentle soft-knee limiter as a
+    // last line of defence against any remaining transients — keeps the
+    // signal's crest factor low and predictable so it sits comfortably
+    // under the rig's ALC threshold instead of pumping it.
+    let peak = 0;
+    for(let i=0;i<totalSamples;i++) peak = Math.max(peak, Math.abs(out[i]));
+    if(peak > 0){ const g = 0.85/peak; for(let i=0;i<totalSamples;i++) out[i]*=g; }
+    const limitThresh = 0.8;
+    for(let i=0;i<totalSamples;i++){
+      const x = out[i];
+      out[i] = x >= 0 ? limitThresh*Math.tanh(x/limitThresh) : -limitThresh*Math.tanh(-x/limitThresh);
+    }
+
+    const buffer = S.audioCtx.createBuffer(1, totalSamples, sr);
+    buffer.getChannelData(0).set(out);
+
+    $('txProgressFill').style.width = '100%';
+    setTimeout(()=>{ $('txProgressTrack').style.display='none'; $('txProgressFill').style.width='0%'; }, 400);
+
+    S.renderedBuffer = buffer;
+    S.lastMatrix = matrix; S.lastMatrixRows = rows; S.lastMatrixCols = cols;
+    $('btnPreviewImage').disabled = false;
+    $('btnTxImage').disabled = false;
+    $('imgInfo').textContent = `Rendered: ${cols}×${rows}, ${(totalSamples/sr).toFixed(1)}s @ ${sr}Hz`;
+  }
+
+  function playBuffer(buffer, toRadio){
+    const src = S.audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const gain = S.audioCtx.createGain();
+    gain.gain.value = toRadio ? S.drive : 0.7;
+    src.connect(gain);
+    if(toRadio && S.outDest){
+      gain.connect(S.outDest);
+    } else {
+      gain.connect(S.audioCtx.destination);
+    }
+    src.start();
+    return src;
+  }
+
+  $('btnRenderImage').addEventListener('click', renderImageToBuffer);
+  $('btnPreviewImage').addEventListener('click', ()=>{ if(S.renderedBuffer) playBuffer(S.renderedBuffer, false); });
+
+  $('btnTxImage').addEventListener('click', async ()=>{
+    if(!S.renderedBuffer) return;
     await enablePTT();
+    startTxPreview(S.lastMatrix, S.lastMatrixRows, S.lastMatrixCols, S.renderedBuffer.duration*1000);
+    try{
+      const src = playBuffer(S.renderedBuffer, true);
+      src.onended = ()=> { disablePTT(); stopTxPreview(); };
+      // Belt-and-braces: also release a moment after the buffer's expected
+      // duration, in case onended never fires (e.g. context stayed suspended).
+      const expectedMs = (S.renderedBuffer.duration*1000) + 1500;
+      setTimeout(()=>{
+        if($('vfoRxTx').textContent==='TX') disablePTT();
+        stopTxPreview();
+      }, expectedMs);
+    }catch(err){
+      console.error('Image transmit failed to start', err);
+      disablePTT();
+      stopTxPreview();
+    }
+  });
+
+  // =====================================================================
+  // PTT unified control
+  // =====================================================================
+  let pttSafetyTimer = null;
+  const PTT_SAFETY_MS = 120000; // hard auto-release after 2 min, regardless of what else goes wrong
+
+  async function enablePTT(){
+    // A suspended AudioContext is the #1 cause of "stuck on transmit": if the
+    // context never resumes, a buffer's onended callback (which releases PTT
+    // after an image TX) never fires. Always resume before keying up.
+    if(S.audioCtx && S.audioCtx.state === 'suspended'){
+      try{ await S.audioCtx.resume(); }catch(e){ console.warn('audioCtx.resume failed', e); }
+    }
+    try{
+      if(S.pttMethod === 'hid') await hidPTT(true);
+      else if(S.pttMethod === 'rts' || S.pttMethod === 'dtr') await serialLinePTT(true, S.pttMethod);
+      else await catPTT(true);
+    }catch(err){
+      console.error('PTT engage failed', err);
+    }
+    $('vfoRxTx').textContent = 'TX';
+    $('vfoRxTx').style.color = 'var(--red)';
+    $('btnPanicRelease').style.display = 'block';
+    clearTimeout(pttSafetyTimer);
+    pttSafetyTimer = setTimeout(()=>{
+      console.warn('PTT safety timeout hit — forcing release');
+      disablePTT();
+    }, PTT_SAFETY_MS);
   }
 
-  setUiPlaying(true);
-  runQueue();
-});
-
-pauseBtn.addEventListener('click', ()=>{
-  if(!isPlayingFlag) return;
-  if(!pauseRequested){
-    pauseRequested = true;
-    if(mode === 'browser') window.speechSynthesis.pause();
-    if(currentAudioEl) currentAudioEl.pause();
-    pauseBtn.textContent = '▶ resume';
-    statusText.textContent = 'HOLDING';
-    stopMeter();
-    if(mode === 'custom') cancelAnimationFrame(spectroRAF);
-  } else {
-    pauseRequested = false;
-    if(mode === 'browser') window.speechSynthesis.resume();
-    if(currentAudioEl) currentAudioEl.play();
-    pauseBtn.textContent = '‖ hold';
-    statusText.textContent = 'TRANSMITTING';
-    startMeter();
-    if(mode === 'custom') spectroFrameReal();
-    petPttWatchdog();
+  async function disablePTT(){
+    clearTimeout(pttSafetyTimer);
+    // try/finally so a failed CAT/HID write can never leave the on-screen
+    // state (or a retry) stuck showing TX.
+    try{
+      if(S.pttMethod === 'hid') await hidPTT(false);
+      else if(S.pttMethod === 'rts' || S.pttMethod === 'dtr') await serialLinePTT(false, S.pttMethod);
+      else await catPTT(false);
+    }catch(err){
+      console.error('PTT release failed — retrying once', err);
+      try{
+        if(S.pttMethod === 'hid') await hidPTT(false);
+        else if(S.pttMethod === 'rts' || S.pttMethod === 'dtr') await serialLinePTT(false, S.pttMethod);
+        else await catPTT(false);
+      }catch(err2){ console.error('PTT release retry also failed', err2); }
+    }finally{
+      $('vfoRxTx').textContent = 'RX';
+      $('vfoRxTx').style.color = '';
+      $('btnPanicRelease').style.display = 'none';
+    }
   }
-});
 
-stopBtn.addEventListener('click', ()=>{
-  stopRequested = true;
-  pauseRequested = false;
-  window.speechSynthesis.cancel();
-  if(currentAudioEl){ currentAudioEl.pause(); currentAudioEl = null; }
-  finishPlayback();
-});
+  const pttBtn = $('btnPtt');
+  pttBtn.addEventListener('mousedown', enablePTT);
+  pttBtn.addEventListener('touchstart', e=>{e.preventDefault(); enablePTT();});
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(evt=> pttBtn.addEventListener(evt, disablePTT));
+
+  // Safety net: if the pointer is released or dragged off the button, or the
+  // tab loses focus/visibility, or you close/hide the app while keyed, force
+  // PTT off rather than trusting only the button's own events.
+  window.addEventListener('mouseup', disablePTT);
+  window.addEventListener('touchend', disablePTT);
+  window.addEventListener('blur', disablePTT);
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) disablePTT(); });
+
+  // Visible panic button — always available the moment PTT is engaged.
+  $('btnPanicRelease').addEventListener('click', async ()=>{
+    stopTune();
+    stopTxPreview();
+    await disablePTT();
+    // Belt and braces: force every possible keying mechanism low, in case
+    // the active pttMethod isn't the one actually holding the rig keyed.
+    try{ if(S.port) await S.port.setSignals({dataTerminalReady:false, requestToSend:false}); }catch(e){}
+    try{ if(S.hid) await hidPTT(false); }catch(e){}
+    try{ if(S.catWriter) await catPTT(false); }catch(e){}
+  });
+
+  // =====================================================================
+  // TEST TUNE — constant carrier
+  // =====================================================================
+  async function toggleTune(){
+    if(!S.audioCtx) S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(S.tuning){
+      stopTune();
+      return;
+    }
+    S.tuning = true;
+    $('btnTune').textContent = '■ Stop carrier';
+    $('btnTune').classList.add('active');
+    await enablePTT();
+
+    const freq = parseFloat($('tuneFreq').value);
+    S.tuneOsc = S.audioCtx.createOscillator();
+    S.tuneOsc.frequency.value = freq;
+    S.tuneGain = S.audioCtx.createGain();
+    S.tuneGain.gain.value = S.drive;
+    S.tuneOsc.connect(S.tuneGain);
+    if(S.outDest) S.tuneGain.connect(S.outDest); else S.tuneGain.connect(S.audioCtx.destination);
+    S.tuneOsc.start();
+
+    const timeoutSec = parseInt($('tuneTimeout').value,10);
+    S.tuneTimer = setTimeout(stopTune, timeoutSec*1000);
+  }
+
+  async function stopTune(){
+    if(S.tuneTimer) clearTimeout(S.tuneTimer);
+    if(S.tuneOsc){ try{S.tuneOsc.stop();}catch(e){} S.tuneOsc.disconnect(); S.tuneOsc=null; }
+    S.tuning = false;
+    $('btnTune').textContent = 'Transmit constant carrier (tune)';
+    $('btnTune').classList.remove('active');
+    await disablePTT();
+  }
+
+  $('btnTune').addEventListener('click', toggleTune);
+
+  // =====================================================================
+  // SETTINGS wiring
+  // =====================================================================
+  function bindRange(id, cb){ $(id).addEventListener('input', e=>cb(parseFloat(e.target.value))); }
+
+  bindRange('wfGain', v=>{ S.waterfall.gain=v; $('wfGainVal').textContent=v.toFixed(1)+'×'; });
+  $('wfMin').addEventListener('input', e=>{ S.waterfall.min=parseFloat(e.target.value)||0; updateFreqLabels(); });
+  $('wfMax').addEventListener('input', e=>{ S.waterfall.max=parseFloat(e.target.value)||3000; updateFreqLabels(); });
+  const speedNames = {1:'Slow',2:'Relaxed',3:'Normal',4:'Fast',5:'Fastest'};
+  bindRange('wfSpeed', v=>{ S.waterfall.speed=v; $('wfSpeedVal').textContent=speedNames[v]; });
+  $('wfFft').addEventListener('change', e=>{
+    S.waterfall.fft = parseInt(e.target.value,10);
+    if(S.analyser) S.analyser.fftSize = S.waterfall.fft;
+  });
+  $('wfPalette').addEventListener('change', e=>{ S.waterfall.palette = e.target.value; });
+
+  $('pttMethod').addEventListener('change', e=>{ S.pttMethod = e.target.value; });
+  $('cm108Bit').addEventListener('change', e=>{ S.cm108Bit = parseInt(e.target.value,10); });
+
+  bindRange('driveSlider', v=>{ S.drive = v/100; $('driveVal').textContent = v+'%'; });
+
+  ['imgCols','imgFrame'].forEach(id=> $(id).addEventListener('input', updateDurationEstimate));
+  const speedNamesTx = v => v<=0.05?'Fast':v<=0.09?'Normal':v<=0.15?'Relaxed':'Slow';
+  bindRange('imgFrame', v=>{
+    $('imgFrameVal').textContent = v.toFixed(2)+' s';
+    $('txSpeedSlider').value = v;
+    $('txSpeedVal').textContent = `${speedNamesTx(v)} — ${v.toFixed(2)}s/column`;
+    updateDurationEstimate();
+  });
+  bindRange('txSpeedSlider', v=>{
+    $('imgFrame').value = v;
+    $('imgFrameVal').textContent = v.toFixed(2)+' s';
+    $('txSpeedVal').textContent = `${speedNamesTx(v)} — ${v.toFixed(2)}s/column`;
+    updateDurationEstimate();
+  });
+  bindRange('imgGamma', v=>{ $('imgGammaVal').textContent = v.toFixed(1); });
+
+  bindRange('tuneFreq', v=>{ $('tuneFreqVal').textContent = Math.round(v)+' Hz'; });
+  bindRange('tuneTimeout', v=>{ $('tuneTimeoutVal').textContent = Math.round(v)+' s'; });
+
+  // simple fake TX meter animation reacting to drive while transmitting
+  setInterval(()=>{
+    if(S.tuning || (S.outDest && S.audioCtx && S.audioCtx.state==='running')){
+      const pct = Math.round(S.drive*100 * (0.85+Math.random()*0.15));
+      $('txMeter').style.width = pct+'%';
+      $('txMeterPct').textContent = pct+'%';
+    } else {
+      $('txMeter').style.width = '0%';
+      $('txMeterPct').textContent = '0%';
+    }
+  }, 150);
+
+  updateFreqLabels();
+  updateVfoDisplay();
+  updateDurationEstimate();
+})();
 </script>
 </body>
 </html>
