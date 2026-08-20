@@ -371,6 +371,7 @@ footer{ text-align:center; margin-top: 18px; font-family: var(--mono); font-size
         <h4>Drive &amp; PTT method</h4>
         <label class="radio-field">Mic / drive gain fed to radio <span class="val" id="driveVal">20%</span></label>
         <input type="range" id="driveSlider" min="0" max="100" value="20">
+        <div class="radio-hint warn">If received audio sounds crunchy, "robotic", or splattery, this is almost always drive set too hot — turn it <i>down</i>, not up, and watch the G90's ALC indicator: it should barely move on voice clips. Start low (10–20%) and bring it up only until the audio is clean and readable.</div>
         <label class="radio-field">PTT method</label>
         <select id="pttMethod">
           <option value="cat" selected>CI-V command (1C 00 — rig TX on/off)</option>
@@ -1068,7 +1069,15 @@ async function connectRadioAudio(){
 let analyserConnectedToRadio = false;
 function connectAnalyserToRadioOut(){
   if(!analyser || !R.outDest || analyserConnectedToRadio) return;
-  analyser.connect(R.outDest);
+  // Route through a dedicated gain stage so the "drive" slider actually
+  // controls what hits the radio's mic/data input, independently of the
+  // local monitor volume. Feeding the radio unscaled full-level audio is
+  // what drives the rig's ALC into compression/clipping — the "robotic"
+  // distortion is that, not an inherent property of the signal.
+  R.radioGain = audioCtx.createGain();
+  R.radioGain.gain.value = R.drive;
+  analyser.connect(R.radioGain);
+  R.radioGain.connect(R.outDest);
   analyserConnectedToRadio = true;
 }
 
@@ -1109,8 +1118,25 @@ async function enablePTT(){
   $r('vfoRxTx').style.color = 'var(--red)';
   setDot('dotPtt','on');
   $r('btnPanicRelease').style.display = 'block';
+  armPttWatchdog();
+}
+
+// The watchdog is a dead-man's switch, not a cap on total transmission time:
+// as long as the queue is actively advancing (a new item starts, audio
+// keeps playing), petPttWatchdog() below keeps pushing the deadline out. It
+// only actually fires — forcing PTT off — if nothing has happened for
+// PTT_SAFETY_MS, e.g. playback genuinely hung. So a long numbers message
+// with many groups is not artificially cut off at 2 minutes.
+function armPttWatchdog(){
   clearTimeout(R.pttSafetyTimer);
-  R.pttSafetyTimer = setTimeout(()=>{ console.warn('PTT safety timeout hit — forcing release'); disablePTT(); }, PTT_SAFETY_MS);
+  R.pttSafetyTimer = setTimeout(()=>{
+    console.warn('PTT watchdog hit — no activity, forcing release');
+    disablePTT();
+    if(isPlayingFlag) readout.textContent = 'PTT auto-released — no transmit activity for 2 min (stuck audio?)';
+  }, PTT_SAFETY_MS);
+}
+function petPttWatchdog(){
+  if(R.pttEngaged) armPttWatchdog();
 }
 
 async function disablePTT(){
@@ -1153,7 +1179,11 @@ window.addEventListener('blur', ()=>{ if(R.pttEngaged) disablePTT(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden && R.pttEngaged) disablePTT(); });
 
 // ---- settings wiring ----
-$r('driveSlider').addEventListener('input', e=>{ R.drive = parseFloat(e.target.value)/100; $r('driveVal').textContent = e.target.value+'%'; });
+$r('driveSlider').addEventListener('input', e=>{
+  R.drive = parseFloat(e.target.value)/100;
+  $r('driveVal').textContent = e.target.value+'%';
+  if(R.radioGain) R.radioGain.gain.value = R.drive;
+});
 $r('pttMethod').addEventListener('change', e=>{
   R.pttMethod = e.target.value;
   setDot('dotPtt', (R.hid || R.pttMethod==='rts' || R.pttMethod==='dtr') ? 'warn' : (R.catWriter ? 'warn' : 'off'));
@@ -1671,6 +1701,7 @@ async function runQueue(){
 
     const item = queue[queueIndex];
     readout.textContent = item.kind === 'audio' ? ('clip  ' + item.label) : item.text.toLowerCase();
+    petPttWatchdog();
 
     if(item.kind === 'audio') await playAudioItem(item);
     else await playTtsItem(item);
@@ -1742,6 +1773,7 @@ pauseBtn.addEventListener('click', ()=>{
     statusText.textContent = 'TRANSMITTING';
     startMeter();
     if(mode === 'custom') spectroFrameReal();
+    petPttWatchdog();
   }
 });
 
